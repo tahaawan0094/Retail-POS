@@ -1,0 +1,168 @@
+/* Vertexia violet brand theme */
+.app-shell {
+  --blue: #5E0CF3;
+  --brand: #5E0CF3;
+  --brand-dark: #5113ce;
+  --brand-light: #efe7ff;
+}
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex: 0 0 42px;
+  transform: scale(1.5);
+  filter: drop-shadow(0 4px 8px #7b25f342);
+}
+.sidebar {
+  background: linear-gradient(165deg, #210a3a 0%, #160626 52%, #0d0318 100%);
+  border-right: 1px solid #5E0CF342;
+}
+.nav-item.active {
+  background: #5E0CF3;
+  box-shadow: 0 6px 18px #5E0CF352;
+}
+.nav-item.active:hover {
+  background: #6d21f4;
+}
+.nav-item:hover {
+  background: #5E0CF31f;
+}
+.nav-item {
+  color: #e9e0f8;
+}
+.nav-item .icon {
+  color: #cbb9e8;
+}
+.nav-item.active,
+.nav-item.active .icon {
+  color: #fff;
+}
+.nav-divider {
+  background: #65447c;
+}
+.branch-card {
+  border-color: #5E0CF361;
+  background: #5E0CF314;
+}
+.branch-icon {
+  color: #d8c5ff;
+  background: #5E0CF32b;
+}
+.version,
+.branch-card small {
+  color: #bca9d2;
+}
+.brand-logo {
+  transform: none;
+  width: 45px;
+  height: 45px;
+  flex-basis: 45px;
+  border: 1px solid #ffffff24;
+  border-radius: 11px;
+  background: #fdfcff;
+  box-shadow: 0 6px 16px #05010975;
+}
+.menu-button,
+.notification-button {
+  color: #25123d;
+}
+.search-field:focus-within {
+  border-color: #ae87f6;
+  box-shadow: 0 0 0 2px #5E0CF318;
+}
+.store-avatar {
+  color: #5E0CF3;
+  background: #f0e9ff;
+}
+.blue {
+  --tone: #5E0CF3;
+}
+.text-blue,
+.view-all,
+.stat-link {
+  color: #5E0CF3;
+}
+.period-tabs .selected,
+.sales-range-tabs button.active {
+  background: #5E0CF3;
+}
+.reports-button {
+  border-color: #5316cc;
+  background: linear-gradient(#7a32f5, #5c19db);
+  box-shadow: 0 2px 5px #5E0CF32e;
+}
+.growth-card {
+  border-color: #e6dafe;
+  background: linear-gradient(110deg, #f7f2ff, #f0e9ff);
+}
+.pos-categories button.active {
+  background: linear-gradient(155deg, #8238f7, #5c16df);
+  box-shadow: 0 5px 13px #5E0CF342;
+}
+.add-product {
+  color: #5E0CF3;
+  background: #efe8ff;
+}
+.add-product:hover {
+  color: #fff;
+  background: #5E0CF3;
+}
+.pos-bottom-actions button.blue {
+  color: #5718cc;
+  border-color: #e6dcfa;
+  background: linear-gradient(140deg, #fff, #f4efff);
+}
+.pos-bottom-actions button.blue > span {
+  color: #5E0CF3;
+  background: #ece3ff;
+}
+.scan-button {
+  color: #6720dc;
+}
+.quantity button {
+  color: #5e1cd3;
+}
+.sales-page-actions .sales-new,
+.sales-table-actions .primary {
+  border-color: #5E0CF3;
+  background: linear-gradient(135deg, #7A35F6, #5E0CF3);
+  box-shadow: 0 4px 11px #5E0CF330;
+}
+.payment-donut {
+  background: conic-gradient(#0aa47b 0 50%, #5E0CF3 50% 72%, #9a56f7 72% 86%, #ee9a17 86% 95%, #e54563 95% 100%);
+}
+.sales-pagination button.active {
+  border-color: #5E0CF3;
+  background: #5E0CF3;
+}
+.sales-payment.card {
+  color: #5f19d5;
+  background: #eee6ff;
+}
+.products-title > span {
+  background: linear-gradient(145deg, #8b3cff, #5b13da);
+}
+.products-page-actions button {
+  color: #5b1acb;
+}
+.products-page-actions button.primary,
+.product-form-actions .save-product {
+  border-color: #5E0CF3;
+  background: linear-gradient(135deg, #7A35F6, #5E0CF3);
+}
+.product-category-tabs button.active {
+  border-color: #5E0CF3;
+  background: linear-gradient(145deg, #7A35F6, #5E0CF3);
+  box-shadow: 0 5px 13px #5E0CF336;
+}
+.product-view-toggle button.active,
+.product-form-tabs button.active {
+  background: #5E0CF3;
+}
+.catalog-table-card input[type="checkbox"] {
+  accent-color: #5E0CF3;
+}
+.catalog-actions button,
+.barcode-input button {
+  color: #651ddb;
+}

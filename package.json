@@ -1,0 +1,42 @@
+{
+  "name": "vertexia-retail-pos",
+  "private": true,
+  "version": "1.0.0",
+  "main": "electron-dist/electron/main.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:desktop": "npm run build:electron && node scripts/dev-desktop.mjs",
+    "build": "tsc -b && vite build && npm run build:electron",
+    "build:electron": "node -e \"require('node:fs').rmSync('electron-dist',{recursive:true,force:true})\" && tsc -p electron/tsconfig.json",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "start:desktop": "npm run build && node scripts/start-desktop.mjs",
+    "test:desktop": "npm run build:electron && node scripts/smoke-desktop.mjs",
+    "test:desktop:pos": "npm run build:electron && node scripts/smoke-desktop.mjs --pos",
+    "test:desktop:products": "npm run build:electron && node scripts/smoke-desktop.mjs --products",
+    "test:dashboard": "npm run build:electron && node --test tests/dashboard.database.test.mjs",
+    "test:pos": "npm run build:electron && node --test tests/pos.database.test.mjs",
+    "test:products": "npm run build:electron && node --test tests/products.database.test.mjs"
+    ,"test:sales": "npm run build:electron && node --test tests/sales.database.test.mjs"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "framer-motion": "^14.0.0",
+    "jsbarcode": "^3.12.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@types/jsbarcode": "^3.11.4",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.7.0",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

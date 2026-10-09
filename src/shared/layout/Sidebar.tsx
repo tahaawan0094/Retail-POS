@@ -1,0 +1,10 @@
+import { Icon, type IconName } from '../ui/Icon'
+
+const navigation: [IconName, string][] = [['home', 'Dashboard'], ['store', 'POS'], ['sale', 'Sales'], ['box', 'Products'], ['inventory', 'Inventory'], ['cart', 'Purchases'], ['users', 'Customers'], ['supplier', 'Suppliers'], ['cash', 'Cash & Shifts'], ['expense', 'Expenses'], ['users', 'Staff'], ['report', 'Reports']]
+export function Sidebar({ collapsed, activePage, onNavigate, locked, onToggleLock }: { collapsed: boolean; activePage: string; onNavigate: (page: string) => void; locked: boolean; onToggleLock: () => void }) {
+  return <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''}`}>
+    <div className="sidebar-brand-row"><a className="brand" href="#"><img className="brand-logo" src="/Retail_POS_Logo-removebg-preview.png" alt="Vertexia POS logo" /><span><strong>Vertexia</strong><small>Retail POS</small></span></a></div>
+    <nav aria-label="Main navigation">{navigation.map(([icon, label]) => <button key={label} aria-label={label} onClick={() => onNavigate(label)} className={`nav-item ${label === activePage ? 'active' : ''}`} aria-current={label === activePage ? 'page' : undefined} title={collapsed ? label : undefined}><Icon name={icon} /><span>{label}</span></button>)}<div className="nav-divider" />{(['Settings', 'My Account'] as const).map((label, i) => <button className={`nav-item ${label === activePage ? 'active' : ''}`} key={label} aria-label={label} onClick={() => onNavigate(label)} aria-current={label === activePage ? 'page' : undefined}><Icon name={i ? 'user' : 'settings'} /><span>{label}</span></button>)}</nav>
+    <div className="sidebar-footer"><button className="sidebar-lock" type="button" aria-label={locked ? 'Use hover sidebar' : 'Keep sidebar open'} aria-pressed={locked} onClick={onToggleLock}><span><Icon name="lock" size={16} />{locked ? 'Sidebar locked' : 'Keep sidebar open'}</span><i /></button><div className="branch-card"><span className="branch-icon"><Icon name="store" /></span><span><strong>Noor Mart</strong><small>Main Branch - Karachi</small></span></div><small className="version">v1.0.0</small></div>
+  </aside>
+}

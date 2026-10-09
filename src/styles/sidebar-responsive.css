@@ -1,0 +1,393 @@
+/* Auto-expanding desktop sidebar */
+@media (min-width: 1001px) {
+  .app-shell,
+  .sidebar-is-collapsed {
+    --sidebar-width: 74px;
+    --expanded-sidebar-width: clamp(210px, 13.75vw, 250px);
+  }
+  .sidebar {
+    width: 74px;
+    padding-inline: 8px;
+    overflow: hidden;
+    transition: width .22s ease, box-shadow .22s ease, padding .22s ease;
+  }
+  .sidebar:hover,
+  .sidebar:focus-within {
+    width: var(--expanded-sidebar-width);
+    padding-inline: 11px;
+    box-shadow: 10px 0 28px #1203233d;
+  }
+  .sidebar .brand {
+    min-width: 190px;
+    padding-inline: 6px;
+  }
+  .sidebar .nav-item {
+    width: 100%;
+    min-width: 54px;
+  }
+  .sidebar .brand > span,
+  .sidebar .nav-item > span,
+  .sidebar .sidebar-footer {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .12s ease, visibility .12s ease;
+  }
+  .sidebar:hover .brand > span,
+  .sidebar:hover .nav-item > span,
+  .sidebar:hover .sidebar-footer,
+  .sidebar:focus-within .brand > span,
+  .sidebar:focus-within .nav-item > span,
+  .sidebar:focus-within .sidebar-footer {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: .08s;
+  }
+  .sidebar.collapsed:hover .brand > span,
+  .sidebar.collapsed:hover .nav-item > span,
+  .sidebar.collapsed:hover .sidebar-footer,
+  .sidebar.collapsed:focus-within .brand > span,
+  .sidebar.collapsed:focus-within .nav-item > span,
+  .sidebar.collapsed:focus-within .sidebar-footer {
+    display: block;
+  }
+  .sidebar.collapsed:hover .nav-item > span,
+  .sidebar.collapsed:focus-within .nav-item > span {
+    display: inline;
+  }
+  .sidebar .nav-divider {
+    min-width: 45px;
+  }
+  .main-shell {
+    margin-left: 74px;
+    transition: margin-left .22s ease;
+  }
+  .sidebar-brand-row {
+    position: relative;
+    min-width: 190px;
+  }
+  .sidebar-lock {
+    position: absolute;
+    top: 8px;
+    right: 4px;
+    width: 31px;
+    height: 31px;
+    border: 1px solid #ffffff26;
+    border-radius: 7px;
+    color: #dccbff;
+    background: #ffffff0d;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .12s ease, background .15s ease;
+  }
+  .sidebar:hover .sidebar-lock,
+  .sidebar:focus-within .sidebar-lock,
+  .sidebar.locked .sidebar-lock {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .sidebar-lock:hover {
+    color: #fff;
+    background: #ffffff1f;
+  }
+  .sidebar-lock[aria-pressed="true"] {
+    color: #5E0CF3;
+    border-color: #fff;
+    background: #fff;
+  }
+  .sidebar.locked {
+    width: var(--expanded-sidebar-width);
+    padding-inline: 11px;
+    box-shadow: 10px 0 28px #1203233d;
+  }
+  .sidebar.locked .brand > span,
+  .sidebar.locked .nav-item > span,
+  .sidebar.locked .sidebar-footer {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .sidebar.collapsed.locked .brand > span,
+  .sidebar.collapsed.locked .sidebar-footer {
+    display: block;
+  }
+  .sidebar.collapsed.locked .nav-item > span {
+    display: inline;
+  }
+  .sidebar-locked .main-shell {
+    margin-left: var(--expanded-sidebar-width);
+  }
+}
+
+.sidebar-lock {
+  display: none;
+}
+@media (min-width: 1001px) {
+  .sidebar-lock {
+    display: grid;
+  }
+}
+
+@media (min-width: 1001px) {
+  .sidebar .sidebar-lock {
+    position: static;
+    width: 100%;
+    height: 38px;
+    margin: 0 0 10px;
+    padding: 0 10px;
+    border: 1px solid #ffffff1c;
+    border-radius: 7px;
+    color: #d9cbea;
+    background: #ffffff0a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .sidebar .sidebar-lock:hover {
+    color: #fff;
+    background: #5E0CF31f;
+    border-color: #5E0CF34a;
+  }
+  .sidebar .sidebar-lock > span {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+  .sidebar .sidebar-lock > i {
+    position: relative;
+    width: 28px;
+    height: 16px;
+    flex: 0 0 28px;
+    border-radius: 9px;
+    background: #ffffff24;
+    transition: background .18s ease;
+  }
+  .sidebar .sidebar-lock > i::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #d9cbea;
+    transition: transform .18s ease, background .18s ease;
+  }
+  .sidebar .sidebar-lock[aria-pressed="true"] {
+    color: #fff;
+    border-color: #5E0CF366;
+    background: #5E0CF324;
+  }
+  .sidebar .sidebar-lock[aria-pressed="true"] > i {
+    background: #5E0CF3;
+  }
+  .sidebar .sidebar-lock[aria-pressed="true"] > i::after {
+    transform: translateX(12px);
+    background: #fff;
+  }
+}
+
+/* Keep the desktop shell responsive while the navigation rail expands. */
+@media (min-width: 1001px) {
+  .app-shell > .sidebar {
+    display: flex;
+    flex-direction: column;
+    contain: layout paint;
+    transition: width .14s ease-out, padding-inline .14s ease-out;
+  }
+
+  .app-shell > .sidebar > nav {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+
+  .app-shell > .sidebar > nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-shell > .sidebar:hover + .main-shell,
+  .app-shell > .sidebar:focus-within + .main-shell,
+  .app-shell > .sidebar.locked + .main-shell {
+    margin-left: var(--expanded-sidebar-width);
+  }
+
+  .app-shell > .main-shell {
+    width: auto;
+    min-width: 0;
+    transition: none;
+  }
+
+  .app-shell > .sidebar .sidebar-footer {
+    display: block;
+    flex: 0 0 auto;
+    width: calc(var(--expanded-sidebar-width) - 22px);
+    min-width: calc(var(--expanded-sidebar-width) - 22px);
+    margin-top: auto;
+    padding: 12px 3px 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .app-shell > .sidebar:hover .sidebar-footer,
+  .app-shell > .sidebar:focus-within .sidebar-footer,
+  .app-shell > .sidebar.locked .sidebar-footer {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-shell > .sidebar .brand > span,
+  .app-shell > .sidebar .nav-item > span,
+  .app-shell > .sidebar .sidebar-footer {
+    transition: opacity .08s linear, visibility .08s linear;
+  }
+
+  .app-shell > .sidebar .sidebar-lock {
+    position: static;
+    inset: auto;
+    display: flex;
+    width: 100%;
+    height: 38px;
+    margin: 0 0 10px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .main-shell,
+  .sidebar .brand > span,
+  .sidebar .nav-item > span,
+  .sidebar .sidebar-footer {
+    transition: none !important;
+  }
+}
+.catalog-pagination button.active {
+  border-color: #5E0CF3;
+  background: #5E0CF3;
+}
+.product-active > button.on {
+  background: #5E0CF3;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline-color: #5E0CF3;
+}
+
+@media (min-width: 1600px) {
+  .topbar {
+    height: 70px;
+    padding-inline: 26px;
+  }
+  .topbar .search-field {
+    width: min(650px, 42vw);
+    height: 40px;
+  }
+  .dashboard {
+    padding: 24px 28px 28px;
+  }
+  .welcome-row {
+    margin-bottom: 20px;
+  }
+  .welcome-row h1 {
+    font-size: 25px;
+  }
+  .welcome-row p {
+    font-size: 14px;
+  }
+  .stats-grid {
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .stat-card {
+    min-height: 184px;
+    padding: 18px 20px;
+  }
+  .stat-card p {
+    font-size: 15px;
+  }
+  .stat-card > strong {
+    font-size: 25px;
+  }
+  .overview-grid,
+  .tables-grid,
+  .bottom-grid {
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .card-heading h2 {
+    font-size: 15px;
+  }
+  .sales-overview {
+    padding: 17px 20px 22px;
+  }
+  .chart-total {
+    font-size: 28px;
+  }
+  .quick-action {
+    min-height: 61px;
+  }
+  .quick-action strong {
+    font-size: 13px;
+  }
+  .quick-action small {
+    font-size: 11px;
+  }
+  .money-item {
+    min-height: 74px;
+  }
+  .money-item p {
+    font-size: 12px;
+  }
+  .money-item strong {
+    font-size: 17px;
+  }
+  .table-card h2,
+  .recent-activity h2 {
+    font-size: 14px;
+  }
+  .table-card table {
+    font-size: 11px;
+  }
+  .table-card td,
+  .recent-sales td {
+    height: 45px;
+  }
+  .activity-row {
+    min-height: 34px;
+    font-size: 10px;
+  }
+  .growth-card h2 {
+    font-size: 15px;
+  }
+  .growth-card p {
+    font-size: 11px;
+  }
+  .sidebar {
+    padding-inline: 13px;
+  }
+  .brand strong {
+    font-size: 27px;
+  }
+  .nav-item {
+    height: 39px;
+    font-size: 13px;
+  }
+}

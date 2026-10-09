@@ -1,0 +1,51 @@
+/* Settings */
+.settings-app { min-height:100vh; background:#f3f7fc; }
+.settings-topbar { height:68px; }
+.settings-global-search { width:min(650px,50vw); }
+.settings-page { width:100%; padding:22px 20px 28px; color:#142f53; }
+.settings-title { min-height:74px; display:flex; align-items:center; gap:18px; margin-bottom:16px; padding:0 10px; }
+.settings-title>span { width:64px; height:64px; display:grid; place-items:center; flex:0 0 64px; border-radius:8px; color:#fff; background:linear-gradient(145deg,#8a47f7,#5E0CF3); box-shadow:0 6px 16px #5E0CF32e; }
+.settings-title h1 { margin:0 0 7px; color:#10294b; font-size:26px; line-height:1; }
+.settings-title p { margin:0; color:#60748f; font-size:14px; }
+.settings-layout { display:grid; grid-template-columns:minmax(0,1fr) 390px; align-items:start; gap:16px; }
+.settings-category-grid { min-width:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.settings-category { min-height:130px; display:grid; grid-template-columns:68px minmax(0,1fr) 20px; align-items:center; gap:18px; padding:20px 18px 20px 22px; text-align:left; }
+.settings-category>span { width:68px; height:68px; display:grid; place-items:center; border-radius:8px; color:var(--tone); background:color-mix(in srgb,var(--tone) 15%,white); }
+.settings-category.blue{--tone:#2479e8}.settings-category.green{--tone:#0aa66f}.settings-category.purple{--tone:#9e31e8}.settings-category.amber{--tone:#ef9611}.settings-category.rose{--tone:#e63b58}.settings-category.teal{--tone:#199c9c}
+.settings-category div strong { display:block; margin-bottom:12px; color:#172e4f; font-size:14px; }
+.settings-category div p { max-width:295px; color:#62758f; font-size:11px; line-height:1.55; }
+.settings-category>.icon { color:#7687a2; transform:rotate(-90deg); }
+.settings-category:hover { border-color:#cfc0ef; box-shadow:0 8px 22px #41206d16; transform:translateY(-1px); }
+.settings-side { min-width:0; display:grid; gap:16px; }
+.settings-side>.card { overflow:hidden; }
+.settings-side-heading { min-height:52px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 16px; }
+.settings-side-heading h2 { display:flex; align-items:center; gap:9px; margin:0; color:#172e4f; font-size:13px; }
+.settings-side-heading h2 .icon { color:#5E0CF3; }
+.settings-side-heading>button { height:29px; padding:0 10px; border:1px solid #d8e2ed; border-radius:5px; color:#5E0CF3; background:#fff; font-size:9px; }
+.settings-store-name { display:flex; align-items:center; gap:14px; padding:6px 16px 17px; }
+.settings-store-name>span { width:63px; height:63px; display:grid; place-items:center; flex:0 0 63px; border-radius:8px; color:#5E0CF3; background:#ebe5ff; }
+.settings-store-name div strong,.settings-store-name div small { display:block; }
+.settings-store-name div strong { margin-bottom:9px; color:#172e4f; font-size:16px; }
+.settings-store-name div small { color:#637891; font-size:10px; }
+.settings-store-name>b { align-self:flex-start; margin-top:8px; padding:5px 10px; border-radius:12px; color:#07845d; background:#dcf7e9; font-size:9px; font-weight:500; }
+.settings-profile-list { display:grid; gap:14px; padding:4px 18px 20px; }
+.settings-profile-list>div { display:grid; grid-template-columns:20px 122px 1fr; align-items:start; gap:7px; color:#506884; font-size:10px; }
+.settings-profile-list>div>.icon { color:#6e72aa; }
+.settings-profile-list>div>strong { color:#263f61; font-weight:500; line-height:1.45; }
+.settings-profile-list>div>strong>span { display:inline; }
+.settings-quick-actions>div:last-child { display:grid; grid-template-columns:1fr 1fr; gap:11px; padding:4px 16px 16px; }
+.settings-quick-actions>div:last-child button { height:41px; display:flex; align-items:center; justify-content:center; gap:10px; border:1px solid #d7e2ed; border-radius:6px; color:#5E0CF3; background:#fff; font-size:10px; }
+.settings-quick-actions>div:last-child button.restore .icon { transform:rotate(180deg); }
+.settings-quick-actions>div:last-child button.danger { color:#df324e; border-color:#f0d8dd; background:#fffafb; }
+.system-status>div:last-child { display:grid; gap:14px; padding:10px 17px 18px; }
+.system-status>div:last-child>div { display:grid; grid-template-columns:20px 1fr auto; align-items:center; gap:10px; color:#415b79; font-size:10px; }
+.system-status i { width:18px; height:18px; display:grid; place-items:center; border-radius:50%; color:#fff; background:#0aa76f; font-style:normal; font-size:10px; }
+.system-status i.neutral { background:#7783ae; }
+.system-status strong { padding:6px 12px; border-radius:6px; font-size:9px; font-weight:500; }
+.system-status strong.good { color:#087b55; background:#dcf7e9; }
+.system-status strong.neutral { color:#485473; background:#e9edf5; }
+
+@media(max-width:1280px){.settings-layout{grid-template-columns:1fr}.settings-side{grid-template-columns:1.2fr 1fr 1fr}.settings-category{min-height:120px}.settings-profile-list>div{grid-template-columns:20px 105px 1fr}}
+@media(max-width:900px){.settings-topbar .profile-button>span:not(.avatar){display:none}.settings-side{grid-template-columns:1fr 1fr}.settings-store-profile{grid-column:1/-1}}
+@media(max-width:640px){.settings-topbar{height:auto;min-height:62px;padding-block:9px}.settings-global-search{width:auto;min-width:0;flex:1}.settings-topbar .notification-button,.settings-topbar .store-switcher,.settings-topbar .profile-button{display:none}.settings-page{padding:14px 10px 22px}.settings-title{padding:0;gap:13px}.settings-title>span{width:52px;height:52px;flex-basis:52px}.settings-title h1{font-size:22px}.settings-title p{font-size:10px}.settings-category-grid,.settings-side{grid-template-columns:1fr}.settings-store-profile{grid-column:auto}.settings-category{min-height:112px;grid-template-columns:54px minmax(0,1fr) 18px;gap:13px;padding:16px 13px}.settings-category>span{width:54px;height:54px}.settings-category div strong{margin-bottom:7px;font-size:12px}.settings-category div p{font-size:9px}}
+@media(max-width:410px){.settings-quick-actions>div:last-child{grid-template-columns:1fr}.settings-profile-list>div{grid-template-columns:20px 90px 1fr}.settings-store-name{align-items:flex-start;flex-wrap:wrap}.settings-store-name>b{margin-left:77px;margin-top:-25px}}

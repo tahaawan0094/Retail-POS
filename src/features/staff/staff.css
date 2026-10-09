@@ -1,0 +1,310 @@
+/* Staff */
+.staff-app {
+  min-height: 100vh;
+  background: #f3f7fc;
+}
+.staff-add {
+  gap: 12px;
+}
+.staff-stat.blue { --tone: #2379e8; }
+.staff-stat.green { --tone: #0ca86f; }
+.staff-stat.amber { --tone: #eca51b; }
+.staff-stat.purple { --tone: #9e26ea; }
+.staff-stat.amber > b {
+  color: #5870a6;
+}
+.staff-stat.purple > b {
+  color: #52617d;
+  font-weight: 500;
+}
+.staff-filters {
+  grid-template-columns: minmax(260px, 1.8fr) minmax(140px, 1fr) minmax(140px, 1fr) 58px;
+}
+.staff-table-card table {
+  min-width: 900px;
+}
+.staff-name {
+  min-width: 135px;
+}
+.staff-role {
+  display: inline-flex;
+  min-width: 58px;
+  padding: 5px 9px;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 8px;
+}
+.staff-role.owner { color: #c83448; background: #ffe0e5; }
+.staff-role.manager { color: #176bb3; background: #dceeff; }
+.staff-role.cashier { color: #087b58; background: #daf6e9; }
+.staff-role.inventory { color: #6830c8; background: #e8ddff; }
+.staff-role.purchasing { color: #a66f00; background: #fff0c8; }
+.staff-side {
+  gap: 12px;
+}
+.staff-side > .card {
+  overflow: hidden;
+}
+.staff-profile {
+  padding: 14px;
+}
+.staff-profile-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+.staff-profile-heading > span {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 70px;
+  overflow: hidden;
+  border: 3px solid #eef2f7;
+  border-radius: 50%;
+  color: #294867;
+  background: linear-gradient(145deg, #d7e0eb, #a9b7c8);
+}
+.staff-profile-heading > div {
+  min-width: 0;
+  padding-top: 4px;
+}
+.staff-profile-heading h2 {
+  margin: 0 0 8px;
+  color: #173354;
+  font-size: 15px;
+}
+.staff-profile-heading div small,
+.staff-profile-heading div b {
+  display: block;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 500;
+}
+.staff-profile-heading div small {
+  margin-bottom: 7px;
+  color: #087d59;
+  background: #ddf7e9;
+}
+.staff-profile-heading div b {
+  color: #1768b0;
+  background: #dceeff;
+}
+.staff-profile-heading > button {
+  height: 29px;
+  margin-left: auto;
+  padding: 0 11px;
+  border: 1px solid #d8e2ed;
+  border-radius: 5px;
+  color: #5E0CF3;
+  background: #fff;
+  font-size: 9px;
+}
+.staff-profile ul {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  color: #5E0CF3;
+  list-style: none;
+  font-size: 9px;
+}
+.staff-profile li span {
+  margin-left: 9px;
+  color: #455f7d;
+}
+.staff-section-heading {
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+  border-top: 1px solid #e3eaf2;
+  border-bottom: 1px solid #e3eaf2;
+}
+.staff-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #173354;
+  font-size: 12px;
+}
+.staff-section-heading h2 .icon {
+  color: #5E0CF3;
+}
+.staff-section-heading button {
+  padding: 0;
+  color: #5E0CF3;
+  background: transparent;
+  font-size: 9px;
+}
+.staff-permissions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 11px 14px 13px;
+}
+.staff-permissions span,
+.staff-permissions button {
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid #dbe4ee;
+  border-radius: 5px;
+  color: #294867;
+  background: #fff;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.staff-permissions span i {
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #2479e7;
+  font-style: normal;
+  font-size: 8px;
+}
+.staff-permissions button {
+  justify-content: center;
+  color: #5E0CF3;
+  background: #f6f2ff;
+}
+.role-distribution > .staff-section-heading,
+.staff-quick-actions > .staff-section-heading {
+  border-top: 0;
+}
+.role-distribution > div:last-child {
+  display: grid;
+  grid-template-columns: 145px 1fr;
+  align-items: center;
+  gap: 5px;
+  padding: 13px;
+}
+.role-donut {
+  width: 125px;
+  height: 125px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(#166fe5 0 50%, #19a9c3 50% 67%, #8c4de9 67% 84%, #f1b23a 84% 92%, #ef3658 92% 100%);
+}
+.role-donut::before {
+  content: '';
+  grid-area: 1 / 1;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: #fff;
+}
+.role-donut span {
+  z-index: 1;
+  grid-area: 1 / 1;
+  text-align: center;
+}
+.role-donut strong,
+.role-donut small {
+  display: block;
+}
+.role-donut strong {
+  color: #173354;
+  font-size: 14px;
+}
+.role-donut small {
+  margin-top: 4px;
+  color: #60758f;
+  font-size: 9px;
+}
+.role-legend {
+  display: grid;
+  gap: 10px;
+}
+.role-legend > div {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  color: #314d6d;
+  font-size: 8px;
+}
+.role-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.role-legend strong {
+  color: #173354;
+  white-space: nowrap;
+}
+.staff-quick-actions > div:last-child {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 13px 13px;
+}
+.staff-quick-actions > div:last-child button {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #d9e3ed;
+  border-radius: 5px;
+  color: #294867;
+  background: #fff;
+  font-size: 8px;
+}
+.staff-quick-actions > div:last-child .icon {
+  color: #5E0CF3;
+}
+
+@media (max-width: 900px) {
+  .staff-filters {
+    grid-template-columns: 1.5fr 1fr 1fr;
+  }
+  .staff-filters .clear {
+    grid-column: 3;
+  }
+}
+
+@media (max-width: 640px) {
+  .staff-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .staff-filters label {
+    grid-column: 1 / -1;
+  }
+  .staff-filters .clear {
+    grid-column: auto;
+  }
+  .staff-permissions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 410px) {
+  .staff-filters,
+  .staff-permissions,
+  .staff-quick-actions > div:last-child {
+    grid-template-columns: 1fr;
+  }
+  .staff-filters label {
+    grid-column: 1;
+  }
+  .role-distribution > div:last-child {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .role-legend {
+    width: 100%;
+  }
+}

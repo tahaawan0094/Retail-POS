@@ -1,0 +1,340 @@
+/* Shared tablet and mobile refinements */
+@media (max-width: 1000px) {
+  .app-shell,
+  .sidebar-is-collapsed {
+    --sidebar-width: 74px;
+  }
+  .sidebar {
+    padding-inline: 8px;
+  }
+  .sidebar .brand {
+    padding-inline: 7px;
+  }
+  .sidebar .brand > span,
+  .sidebar .nav-item > span,
+  .sidebar .sidebar-footer {
+    display: none;
+  }
+  .sidebar .nav-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .sidebar .nav-divider {
+    margin-inline: 7px;
+  }
+  .main-shell {
+    min-width: 0;
+  }
+  .pos-products,
+  .pos-categories,
+  .pos-catalog,
+  .product-grid,
+  .sale-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell,
+  .sidebar-is-collapsed {
+    --sidebar-width: 0px;
+  }
+  .sidebar {
+    width: 68px;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 8px 0 24px #05182d2e;
+  }
+  .sidebar-is-collapsed .sidebar {
+    transform: translateX(0);
+  }
+  .main-shell {
+    width: 100%;
+    margin-left: 0;
+    overflow: hidden;
+  }
+  .topbar {
+    position: relative;
+    z-index: 20;
+  }
+  .dashboard {
+    width: 100%;
+    overflow: hidden;
+  }
+  .welcome-row {
+    margin-bottom: 14px;
+  }
+  .date-controls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+  .date-controls .date {
+    grid-column: 1 / -1;
+  }
+  .date-controls .time {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .date-controls select {
+    margin-left: 0;
+  }
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .sales-overview,
+  .quick-actions,
+  .money-overview {
+    grid-column: auto;
+  }
+  .quick-action strong,
+  .money-item p {
+    font-size: 12px;
+  }
+  .quick-action small {
+    font-size: 10px;
+  }
+  .money-item strong {
+    font-size: 15px;
+  }
+  .activity-list {
+    padding-inline: 7px;
+  }
+  .activity-row {
+    grid-template-columns: 12px 48px minmax(0, 1fr) 72px;
+  }
+  .activity-detail,
+  .activity-ref {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .growth-card {
+    padding: 16px 18px;
+  }
+  .benefits {
+    grid-template-columns: 1fr;
+  }
+  .store-illustration {
+    width: 94px;
+  }
+  .pos-app .topbar {
+    height: auto;
+  }
+  .pos-topbar {
+    min-height: 64px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+  .pos-topbar .menu-button {
+    grid-column: 1;
+  }
+  .pos-search {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+  }
+  .pos-search input::placeholder {
+    font-size: 10px;
+  }
+  .scan-button {
+    grid-column: 3;
+    min-width: 62px;
+    padding-inline: 7px;
+    gap: 5px;
+    font-size: 10px;
+  }
+  .scan-button span {
+    font-size: 17px;
+  }
+  .pos-topbar .topbar-right {
+    grid-column: 4;
+    margin-left: 0;
+  }
+  .customer-select {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+  }
+  .pos-screen {
+    padding-top: 0;
+    width: 100%;
+    min-width: 0;
+  }
+  .pos-products {
+    min-height: auto;
+    grid-template-rows: 72px auto auto;
+    padding: 10px;
+  }
+  .pos-categories {
+    width: 100%;
+    grid-template-columns: repeat(9, 78px);
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+  .pos-categories button small {
+    font-size: 10px;
+  }
+  .pos-catalog {
+    overflow: visible;
+  }
+  .product-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .pos-product-card {
+    width: 100%;
+    min-width: 0;
+    min-height: 206px;
+  }
+  .pos-product-picture {
+    height: 98px;
+  }
+  .pos-product-card h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .pos-product-card > strong {
+    font-size: 12px;
+  }
+  .pos-packaged {
+    transform: scale(.9);
+  }
+  .fresh-product {
+    font-size: 62px;
+  }
+  .pos-bottom-actions {
+    margin-top: 2px;
+    padding: 9px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .pos-bottom-actions button {
+    min-height: 64px;
+  }
+  .pos-bottom-actions button > span {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    font-size: 16px;
+  }
+  .pos-bottom-actions strong,
+  .pos-bottom-actions small {
+    white-space: normal;
+  }
+  .sale-panel {
+    width: calc(100% - 20px);
+    margin: 10px;
+    min-height: 810px;
+  }
+  .sale-panel-title {
+    padding-left: 13px;
+  }
+  .sale-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+  .sale-table {
+    min-width: 640px;
+  }
+  .sale-summary {
+    margin-inline: 10px;
+  }
+  .payment-area {
+    margin-inline: 10px;
+    padding-inline: 8px;
+  }
+  .payment-methods {
+    gap: 5px;
+  }
+  .payment-methods button {
+    min-width: 0;
+    height: 61px;
+  }
+  .payment-methods button span {
+    font-size: 8px;
+  }
+  .cash-fields {
+    gap: 7px;
+  }
+  .complete-sale {
+    margin-inline: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    padding-inline: 9px;
+    gap: 9px;
+  }
+  .topbar .profile-button {
+    display: none;
+  }
+  .topbar-right {
+    gap: 8px;
+  }
+  .dashboard {
+    padding: 10px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .stat-card {
+    min-height: 146px;
+  }
+  .sparkline {
+    width: 58px;
+  }
+  .period-tabs button {
+    padding-inline: 7px;
+  }
+  .chart-total {
+    font-size: 22px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+  }
+  .table-wrap table {
+    min-width: 350px;
+  }
+  .growth-card {
+    align-items: flex-end;
+  }
+  .store-illustration {
+    width: 72px;
+  }
+  .pos-topbar {
+    padding-inline: 8px;
+  }
+  .pos-topbar .notification-button {
+    display: none;
+  }
+  .pos-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .pos-topbar .topbar-right {
+    display: none;
+  }
+  .pos-bottom-actions button {
+    padding: 7px;
+    gap: 6px;
+  }
+  .pos-bottom-actions strong {
+    font-size: 9px;
+  }
+  .sale-panel-title h2 {
+    font-size: 15px;
+  }
+  .sale-summary .sale-total span,
+  .sale-summary .sale-total b {
+    font-size: 18px;
+  }
+}
