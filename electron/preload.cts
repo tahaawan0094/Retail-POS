@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DashboardQuery, PosCompleteSaleRequest, PosCreateCustomerInput, PosCreateProductInput, PosCartLineInput, ProductCatalogQuery, ProductSaveInput, SalesListQuery, SalesReturnRequest, VertexiaDesktopApi } from '../src/types/desktop-api.js'
 
 const api: VertexiaDesktopApi = {
+  retail: {
+    getSnapshot: branchId => ipcRenderer.invoke('retail:get-snapshot', branchId),
+    adjustStock: request => ipcRenderer.invoke('retail:adjust-stock', request),
+    receivePurchase: request => ipcRenderer.invoke('retail:receive-purchase', request),
+    paySupplier: request => ipcRenderer.invoke('retail:pay-supplier', request),
+  },
   dashboard: {
     getSnapshot: (query: DashboardQuery) => ipcRenderer.invoke('dashboard:get-snapshot', query),
     search: (term: string, branchId: string) => ipcRenderer.invoke('dashboard:search', term, branchId),

@@ -1,0 +1,98 @@
+(async () => {
+  const wait = async (predicate, label) => {
+    const deadline = Date.now() + 10000
+    while (Date.now() < deadline) {
+      if (await predicate()) return
+      await new Promise(resolve => setTimeout(resolve, 80))
+    }
+    throw new Error('Timed out: ' + label + '\n' + document.body.innerText.slice(-1800))
+  }
+  const assert = (condition, message) => { if (!condition) throw new Error(message) }
+  const input = (selector, value) => {
+    const element = document.querySelector(selector)
+    assert(element, 'Missing input: ' + selector)
+    const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
+    Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value)
+    element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+  }
+  const clickText = (selector, text) => {
+    const button = [...document.querySelectorAll(selector)].find(element => element.textContent.trim() === text)
+    assert(button && !button.disabled, 'Missing/enabled action: ' + text)
+    button.click()
+  }
+  const navigate = name => document.querySelector('.sidebar button[aria-label="' + name + '"]').click()
+  const refresh = () => window.dispatchEvent(new Event('vertexia:retail-data-changed'))
+  const api = window.vertexia
+  assert(api?.retail, 'Retail preload API is unavailable')
+  await wait(() => document.querySelector('.new-purchase') && !document.querySelector('.new-purchase').disabled, 'initial purchases screen')
+  assert((await api.retail.getSnapshot('branch-main')).purchases.length === 0, 'Fresh database contains sample purchases')
+  const product = await api.products.save('branch-main', { name:'Smoke Rice',sku:'SMOKE-RICE',barcode:'SMOKE-RICE',category:'Grocery',subcategory:'',brand:'',unit:'Kg',purchasePricePaisa:10000,sellingPricePaisa:15000,mrpPaisa:0,minimumStockMilli:1000,openingStockMilli:0,status:'active',imageDataUrl:null })
+  refresh()
+  await wait(() => document.querySelector('.new-purchase') && !document.querySelector('.new-purchase').disabled, 'catalog refresh')
+  // Actual purchase form, including a rapid repeated submission.
+  document.querySelector('.new-purchase').click()
+  await wait(() => document.querySelector('.purchase-modal'), 'purchase modal')
+  await wait(() => document.querySelector('.purchase-line select option[value="' + product.id + '"]'), 'database product in purchase form')
+  input('.purchase-document-fields input', 'Smoke Supplier')
+  input('.purchase-line select', product.id)
+  input('.purchase-line input[type="number"]', '2')
+  await new Promise(resolve => setTimeout(resolve, 100))
+  const postPurchase = document.querySelector('.purchase-modal-actions .primary')
+  postPurchase.click(); postPurchase.click()
+  await wait(() => !document.querySelector('.purchase-modal'), 'purchase posted')
+  let snapshot = await api.retail.getSnapshot('branch-main')
+  assert(snapshot.purchases.length === 1 && snapshot.products[0].stockMilli === 2000, 'Purchase form did not post shared stock exactly once')
+  assert(snapshot.suppliers[0].outstandingPaisa === 20000, 'Purchase supplier ledger mismatch')
+  document.querySelector('.new-purchase').click()
+  await wait(() => document.querySelector('.purchase-modal'), 'fractional purchase preview')
+  input('.purchase-line input[type="number"]', '0.333')
+  input('.purchase-line label:nth-child(3) input', '1.01')
+  await wait(() => document.querySelector('.purchase-line strong')?.textContent === 'Rs. 0.34', 'purchase preview rounded to the posted paisa amount')
+  clickText('.purchase-modal-actions button', 'Cancel')
+  await wait(() => !document.querySelector('.purchase-modal'), 'fractional draft cancelled')
+  // Existing POS and the new shared retail read model use the same stock.
+  await api.pos.openShift('branch-main', 100000)
+  const saleRequest = { branchId:'branch-main',operationId:crypto.randomUUID(),customerId:'customer-walk-in',lines:[{productId:product.id,quantityMilli:1000,discountBasisPoints:0}],paymentMethod:'Cash',cashReceivedPaisa:20000 }
+  const sale = await api.pos.completeSale(saleRequest)
+  const duplicate = await api.pos.completeSale(saleRequest)
+  assert(sale.saleId === duplicate.saleId, 'Sale IPC retry duplicated an invoice')
+  refresh()
+  navigate('Sales')
+  await wait(() => [...document.querySelectorAll('.sales-transactions button')].some(button => button.getAttribute('aria-label') === 'View ' + sale.invoiceNumber), 'live invoice row')
+  document.querySelector('.sales-transactions button[aria-label="View ' + sale.invoiceNumber + '"]').click()
+  await wait(() => document.querySelector('.sales-invoice-modal'), 'invoice detail')
+  input('.sales-return-form input[type="number"]', '1')
+  input('input[aria-label="Return reason"]', 'Unopened pack returned')
+  await new Promise(resolve => setTimeout(resolve, 100))
+  clickText('.sales-return-form button', 'Post Return')
+  await wait(() => document.querySelector('.sales-invoice-returns')?.textContent.includes('RET-'), 'return form completed')
+  assert((await api.retail.getSnapshot('branch-main')).products[0].stockMilli === 2000, 'Return did not restore shared stock')
+  document.querySelector('button[aria-label="Close invoice"]').click()
+  navigate('Inventory')
+  await wait(() => document.querySelector('.inventory-page'), 'inventory screen')
+  clickText('.inventory-tabs button', 'Stock Movement')
+  await wait(() => document.querySelector('.inventory-movement-card')?.textContent.includes('sale return'), 'shared movement history')
+  clickText('.inventory-tabs button', 'Stock Adjustments')
+  await wait(() => document.querySelector('.stock-adjustment-form'), 'stock adjustment panel')
+  input('.stock-adjustment-form select', product.id)
+  input('.stock-adjustment-form input[type="number"]', '0.5')
+  clickText('.stock-adjustment-form button', 'Post Adjustment')
+  await wait(() => document.querySelector('.adjustment-message.success'), 'adjustment posted')
+  assert((await api.retail.getSnapshot('branch-main')).products[0].stockMilli === 2500, 'Adjustment used another stock store')
+  navigate('Suppliers')
+  await wait(() => document.querySelector('.supplier-details'), 'supplier profile')
+  clickText('.customer-profile-actions button', 'Pay Supplier')
+  await wait(() => document.querySelector('.supplier-payment-modal'), 'supplier payment modal')
+  input('.supplier-payment-body input[type="number"]', '200')
+  clickText('.supplier-payment-actions button', 'Save Payment')
+  await wait(() => !document.querySelector('.supplier-payment-modal'), 'supplier payment posted')
+  snapshot = await api.retail.getSnapshot('branch-main')
+  assert(snapshot.suppliers[0].outstandingPaisa === 0 && snapshot.purchases[0].duePaisa === 0, 'Supplier payment did not settle the purchase')
+  const dashboard = await api.dashboard.getSnapshot({ branchId:'branch-main',dateRange:'today',chartPeriod:'today' })
+  assert(dashboard.cashInDrawerPaisa === 80000, 'Drawer mismatch after purchase, sale, return and supplier payment')
+  navigate('Purchases')
+  await wait(() => document.querySelector('.purchases-table-card tbody tr .purchase-status')?.textContent === 'Paid', 'settled purchase status')
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  assert(!document.querySelector('.retail-data-status.error'), 'Retail UI has an unresolved database error')
+  return { offline:true,purchaseForm:true,fractionalPreview:true,saleIpcRetry:true,returnForm:true,inventoryMovements:true,adjustmentForm:true,supplierPaymentForm:true,stockMilli:snapshot.products[0].stockMilli,cashInDrawerPaisa:dashboard.cashInDrawerPaisa }
+})()

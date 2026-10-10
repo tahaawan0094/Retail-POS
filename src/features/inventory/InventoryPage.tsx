@@ -1,9 +1,11 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon, type IconName } from '../../shared/ui/Icon'
 import { PageShell, type PageProps } from '../../shared/layout/PageShell'
 import { PosProductVisual } from '../../shared/ui/ProductVisual'
 import { useRetailData } from '../../app/data/useRetailData'
+import { useOperationIdentity } from '../../shared/hooks/useOperationIdentity'
+import { RetailDataStatus } from '../../shared/ui/RetailDataStatus'
 import type { InventoryMovementRecord, ProductRecord } from '../products/products.types'
 
 const money = (value: number) => value.toLocaleString('en-PK')
@@ -41,20 +43,27 @@ function StockAlerts({ products }: { products: ProductRecord[] }) {
 }
 
 function StockAdjustmentPanel() {
-  const { products,adjustStock } = useRetailData()
-  const [productId,setProductId] = useState(products[0]?.id ?? '')
+  const { products,adjustStock,busy,loading,error } = useRetailData()
+  const operation = useOperationIdentity('stock-adjustment')
+  const [selectedProductId,setProductId] = useState('')
+  const productId = selectedProductId || products.find(item => item.status === 'active')?.id || ''
   const [direction,setDirection] = useState<'increase' | 'decrease'>('increase')
   const [quantity,setQuantity] = useState(1)
   const [reason,setReason] = useState('Stock count correction')
   const [message,setMessage] = useState<{ tone:'error' | 'success'; text:string } | null>(null)
   const product = products.find(item => item.id === productId)
-  const submit = () => {
-    const result = adjustStock(productId,direction === 'increase' ? quantity : -quantity,reason)
+  const submit = async () => {
+    if (!Number.isFinite(quantity) || quantity <= 0) return setMessage({ tone:'error',text:'Quantity must be greater than zero.' })
+    const delta = direction === 'increase' ? quantity : -quantity
+    try {
+    const result = await adjustStock(productId,delta,reason,operation.idFor({productId,delta,reason}))
     if (!result.ok) return setMessage({ tone:'error',text:result.error })
+    operation.reset()
     setMessage({ tone:'success',text:'Stock adjustment posted and added to movement history.' })
     setQuantity(1)
+    } catch(cause) { setMessage({tone:'error',text:cause instanceof Error ? cause.message : 'Adjustment could not be submitted.'}) }
   }
-  return <section className="card stock-adjustment-panel"><div className="inventory-table-heading"><div><h2>New Stock Adjustment</h2><p>Post a traceable correction to the selected product.</p></div></div><div className="stock-adjustment-form"><label>Product<select value={productId} onChange={event => setProductId(event.target.value)}>{products.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="adjustment-current"><span>Current Stock</span><strong>{product?.stock ?? 0} {product?.unit ?? ''}</strong></div><label>Adjustment Type<select value={direction} onChange={event => setDirection(event.target.value as 'increase' | 'decrease')}><option value="increase">Increase Stock</option><option value="decrease">Decrease Stock</option></select></label><label>Quantity<input type="number" min="0.001" step="0.001" value={quantity} onChange={event => setQuantity(Number(event.target.value))} /></label><label className="full">Reason<input value={reason} onChange={event => setReason(event.target.value)} placeholder="Why is stock being adjusted?" /></label>{message && <p className={`adjustment-message ${message.tone} full`}>{message.text}</p>}<button className="post-adjustment full" onClick={submit}><Icon name="check" size={16} /> Post Adjustment</button></div></section>
+  return <section className="card stock-adjustment-panel"><div className="inventory-table-heading"><div><h2>New Stock Adjustment</h2><p>Post a traceable correction to the selected product.</p></div></div><div className="stock-adjustment-form"><label>Product<select disabled={busy} value={productId} onChange={event => setProductId(event.target.value)}>{products.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div className="adjustment-current"><span>Current Stock</span><strong>{product?.stock ?? 0} {product?.unit ?? ''}</strong></div><label>Adjustment Type<select disabled={busy} value={direction} onChange={event => setDirection(event.target.value as 'increase' | 'decrease')}><option value="increase">Increase Stock</option><option value="decrease">Decrease Stock</option></select></label><label>Quantity<input disabled={busy} type="number" min="0.001" step="0.001" value={quantity} onChange={event => setQuantity(Number(event.target.value))} /></label><label className="full">Reason<input disabled={busy} value={reason} onChange={event => setReason(event.target.value)} placeholder="Why is stock being adjusted?" /></label>{message && <p className={`adjustment-message ${message.tone} full`}>{message.text}</p>}<button className="post-adjustment full" disabled={busy || loading || Boolean(error) || !productId} onClick={() => void submit()}><Icon name="check" size={16} /> Post Adjustment</button></div></section>
 }
 
 function InventoryQuickActions({ onAdjustment }: { onAdjustment: () => void }) {
@@ -70,11 +79,13 @@ function CategoryStockSummary({ products }: { products: ProductRecord[] }) {
 
 function InventoryScreen() {
   const { products,movements } = useRetailData()
+  const [currentTime,setCurrentTime] = useState(() => new Date())
+  useEffect(() => { const timer=window.setInterval(() => setCurrentTime(new Date()),60_000);return () => window.clearInterval(timer) },[])
   const [tab,setTab] = useState('Stock Overview')
   const lowCount = products.filter(product => product.stock <= product.minimumStock).length
   const tabs = [['Stock Overview',''],['Stock Movement',''],['Stock Adjustments',''],['Low Stock',String(lowCount)],['Expiry','0'],['Dead Stock',''],['Stock Transfer','']]
   const visibleProducts = tab === 'Low Stock' ? products.filter(product => product.stock <= product.minimumStock) : products
-  return <motion.main className="inventory-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}><div className="inventory-title-row"><div className="inventory-title"><span><Icon name="box" size={28} /></span><div><h1>Inventory</h1><p>Track your stock, manage inventory and avoid running out of popular items.</p></div></div><div className="inventory-date"><span><Icon name="calendar" size={17} /> Thursday, 2 October 2026</span><span><Icon name="clock" size={17} /> 10:42 AM</span></div></div><div className="inventory-tabs">{tabs.map(([label,count]) => <button key={label} className={tab === label ? 'active' : ''} onClick={() => setTab(label)}>{label}{count && <span className={label === 'Expiry' ? 'orange' : ''}>{count}</span>}</button>)}</div><div className="inventory-layout"><div className="inventory-main">{tab === 'Stock Movement' ? <StockMovementTable movements={movements} /> : tab === 'Stock Adjustments' ? <StockAdjustmentPanel /> : <><InventoryStats products={products} movements={movements} /><InventoryTable products={visibleProducts} /></>}</div><aside className="inventory-side"><StockAlerts products={products} /><InventoryQuickActions onAdjustment={() => setTab('Stock Adjustments')} /><CategoryStockSummary products={products} /></aside></div></motion.main>
+  return <motion.main className="inventory-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}><div className="inventory-title-row"><div className="inventory-title"><span><Icon name="box" size={28} /></span><div><h1>Inventory</h1><p>Track your stock, manage inventory and avoid running out of popular items.</p></div></div><div className="inventory-date"><span><Icon name="calendar" size={17} /> {currentTime.toLocaleDateString('en-PK',{timeZone:'Asia/Karachi',weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span><span><Icon name="clock" size={17} /> {currentTime.toLocaleTimeString('en-PK',{timeZone:'Asia/Karachi',hour:'2-digit',minute:'2-digit'})}</span></div></div><RetailDataStatus /><div className="inventory-tabs">{tabs.map(([label,count]) => <button key={label} className={tab === label ? 'active' : ''} disabled={['Expiry','Dead Stock','Stock Transfer'].includes(label)} title={['Expiry','Dead Stock','Stock Transfer'].includes(label) ? 'Planned for a later phase.' : undefined} onClick={() => setTab(label)}>{label}{count && <span className={label === 'Expiry' ? 'orange' : ''}>{count}</span>}</button>)}</div><div className="inventory-layout"><div className="inventory-main">{tab === 'Stock Movement' ? <StockMovementTable movements={movements} /> : tab === 'Stock Adjustments' ? <StockAdjustmentPanel /> : <><InventoryStats products={products} movements={movements} /><InventoryTable products={visibleProducts} /></>}</div><aside className="inventory-side"><StockAlerts products={products} /><InventoryQuickActions onAdjustment={() => setTab('Stock Adjustments')} /><CategoryStockSummary products={products} /></aside></div></motion.main>
 }
 
 export default function InventoryPage(props: PageProps) { return <PageShell {...props} activePage="Inventory" className="inventory-app" header={onMenu => <InventoryHeader onMenu={onMenu} />}><InventoryScreen /></PageShell> }

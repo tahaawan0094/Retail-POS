@@ -24,7 +24,7 @@ test('creates the production schema once and seeds a usable store', () => {
   const productCount = database.connection.prepare('SELECT COUNT(*) AS count FROM products').get().count
   const foreignKeys = database.connection.prepare('PRAGMA foreign_keys').get().foreign_keys
 
-  assert.equal(version, 3)
+  assert.equal(version, 5)
   assert.equal(productCount, 12)
   assert.equal(foreignKeys, 1)
 })
@@ -45,19 +45,20 @@ test('a fresh production database contains no demo transactions', () => {
   production.close()
 })
 
-test('removes the legacy automatic demo seed from an existing database', () => {
+test('preserves existing records even when a legacy demo marker is present', () => {
   const directory = mkdtempSync(join(tmpdir(),'vertexia-dashboard-'))
   const path = join(directory,'vertexia.db')
   const clock = () => new Date('2026-10-08T12:00:00+05:00')
   const legacy = new VertexiaDatabase(path,clock,{ seedDemoData:true })
-  assert.ok(legacy.getDashboardSnapshot({ branchId:'branch-main',dateRange:'today',chartPeriod:'7_days' }).salesPaisa > 0)
+  const original = legacy.getDashboardSnapshot({ branchId:'branch-main',dateRange:'today',chartPeriod:'7_days' })
+  assert.ok(original.salesPaisa > 0)
   legacy.close()
 
   const production = new VertexiaDatabase(path,clock)
-  const cleaned = production.getDashboardSnapshot({ branchId:'branch-main',dateRange:'today',chartPeriod:'7_days' })
-  assert.equal(cleaned.salesPaisa,0)
-  assert.equal(cleaned.lowStockCount,0)
-  assert.equal(production.connection.prepare("SELECT value FROM app_meta WHERE key='demo_seed_removed'").get().value,'1')
+  const preserved = production.getDashboardSnapshot({ branchId:'branch-main',dateRange:'today',chartPeriod:'7_days' })
+  assert.equal(preserved.salesPaisa,original.salesPaisa)
+  assert.equal(preserved.lowStockCount,original.lowStockCount)
+  assert.equal(production.connection.prepare("SELECT value FROM app_meta WHERE key='demo_seed_removed'").get(),undefined)
   production.close()
   rmSync(directory,{ recursive:true,force:true })
 })

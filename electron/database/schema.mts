@@ -266,4 +266,73 @@ export const migrations = [
       CREATE INDEX IF NOT EXISTS idx_sale_return_items_sale_item ON sale_return_items(sale_item_id);
     `,
   },
+  {
+    version: 5,
+    sql: `
+      CREATE TABLE operation_results (
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        operation_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        result_json TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        PRIMARY KEY (branch_id, operation_id)
+      ) STRICT;
+
+      CREATE TABLE document_sequences (
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        kind TEXT NOT NULL CHECK (kind IN ('sale','return','purchase')),
+        business_date TEXT NOT NULL,
+        last_value INTEGER NOT NULL CHECK (last_value >= 0),
+        PRIMARY KEY (branch_id, kind, business_date)
+      ) STRICT;
+
+      CREATE TABLE purchases (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL REFERENCES businesses(id),
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+        supplier_name_snapshot TEXT NOT NULL,
+        purchase_number TEXT NOT NULL,
+        supplier_invoice_number TEXT NOT NULL,
+        business_date TEXT NOT NULL,
+        total_paisa INTEGER NOT NULL CHECK (total_paisa > 0),
+        created_at TEXT NOT NULL,
+        UNIQUE (branch_id, purchase_number)
+      ) STRICT;
+      CREATE UNIQUE INDEX idx_purchases_supplier_invoice ON purchases(business_id,supplier_id,supplier_invoice_number COLLATE NOCASE)
+        WHERE supplier_invoice_number <> '';
+      CREATE INDEX idx_purchases_branch_date ON purchases(branch_id,business_date);
+
+      CREATE TABLE purchase_items (
+        id TEXT PRIMARY KEY,
+        purchase_id TEXT NOT NULL REFERENCES purchases(id),
+        product_id TEXT NOT NULL REFERENCES products(id),
+        product_name_snapshot TEXT NOT NULL,
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli > 0),
+        unit_cost_paisa INTEGER NOT NULL CHECK (unit_cost_paisa >= 0),
+        line_total_paisa INTEGER NOT NULL CHECK (line_total_paisa >= 0),
+        UNIQUE (purchase_id, product_id)
+      ) STRICT;
+
+      CREATE TABLE supplier_payments (
+        id TEXT PRIMARY KEY,
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+        business_date TEXT NOT NULL,
+        method TEXT NOT NULL CHECK (method IN ('Cash','Bank Transfer','JazzCash','Easypaisa','Card')),
+        amount_paisa INTEGER NOT NULL CHECK (amount_paisa > 0),
+        reference TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX idx_supplier_payments_branch_supplier ON supplier_payments(branch_id,supplier_id);
+
+      CREATE TABLE supplier_payment_allocations (
+        payment_id TEXT NOT NULL REFERENCES supplier_payments(id),
+        purchase_id TEXT NOT NULL REFERENCES purchases(id),
+        amount_paisa INTEGER NOT NULL CHECK (amount_paisa > 0),
+        PRIMARY KEY (payment_id, purchase_id)
+      ) STRICT;
+    `,
+  },
 ] as const

@@ -1,124 +1,87 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { RetailDataContext, type RetailDataContextValue } from './retailData.context'
-import { loadRetailData, saveRetailData } from './retailData.storage'
-import type { PurchaseDraft, PurchaseRecord, PurchaseStatus } from '../../features/purchases/purchases.types'
-import type { InventoryMovementRecord, ProductDraft, ProductRecord } from '../../features/products/products.types'
-import type { CashTransactionRecord, SupplierLedgerEntry, SupplierPaymentMethod, SupplierPaymentRecord, SupplierRecord } from '../../features/suppliers/suppliers.types'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { RetailDataContext, type OperationResult, type RetailDataContextValue } from './retailData.context'
+import type { PurchaseDraft, PurchaseRecord } from '../../features/purchases/purchases.types'
+import type { InventoryMovementRecord, ProductRecord } from '../../features/products/products.types'
+import type { SupplierLedgerEntry, SupplierPaymentMethod, SupplierPaymentRecord, SupplierRecord } from '../../features/suppliers/suppliers.types'
+import type { RetailSnapshot } from '../../types/desktop-api'
+import { RETAIL_DATA_CHANGED, notifyRetailDataChanged } from '../../services/retail-events'
 
-const createId = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`
+type ViewData = Pick<RetailDataContextValue, 'products' | 'movements' | 'purchases' | 'suppliers' | 'supplierPayments' | 'supplierLedger' | 'businessDate'>
+const empty: ViewData = { products: [], movements: [], purchases: [], suppliers: [], supplierPayments: [], supplierLedger: [], businessDate: '' }
+const branchId = 'branch-main'
+
+function toFixedUnits(value: number, scale: number, label: string): number {
+  const scaled = value * scale, rounded = Math.round(scaled)
+  if (!Number.isFinite(value) || !Number.isSafeInteger(rounded) || Math.abs(scaled - rounded) > 0.000001) throw new Error(label + ' has too many decimal places or is outside the supported range.')
+  return rounded
+}
+
+function view(snapshot: RetailSnapshot): ViewData {
+  return {
+    businessDate: snapshot.businessDate,
+    products: snapshot.products.map((item): ProductRecord => ({ id: item.id, kind: item.kind, name: item.name, barcode: item.barcode, sku: item.sku, category: item.category, subcategory: item.subcategory, brand: item.brand, unit: item.unit, purchasePriceRupees: item.purchasePricePaisa / 100, sellingPriceRupees: item.sellingPricePaisa / 100, mrpRupees: item.mrpPaisa / 100, minimumStock: item.minimumStockMilli / 1000, stock: item.stockMilli / 1000, status: item.status, imageDataUrl: item.imageDataUrl, createdAt: item.createdAt, updatedAt: item.updatedAt })),
+    movements: snapshot.movements.map((item): InventoryMovementRecord => ({ id: item.id, productId: item.productId, productName: item.productName, type: item.type, quantityDelta: item.quantityDeltaMilli / 1000, balanceAfter: item.balanceAfterMilli / 1000, reason: item.reason, referenceId: item.referenceId, createdAt: item.occurredAt })),
+    purchases: snapshot.purchases.map((item): PurchaseRecord => ({ id: item.id, supplierId: item.supplierId, purchaseNumber: item.purchaseNumber, supplier: item.supplierName, supplierInvoiceNumber: item.supplierInvoiceNumber, purchaseDate: item.businessDate, itemCount: item.lines.length, totalAmountRupees: item.totalPaisa / 100, paidAmountRupees: item.paidPaisa / 100, dueAmountRupees: item.duePaisa / 100, status: item.duePaisa === 0 ? 'Paid' : item.paidPaisa === 0 ? 'Unpaid' : 'Partial', items: item.lines.map(line => ({ productId: line.productId, quantity: line.quantityMilli / 1000, unitCostRupees: line.unitCostPaisa / 100 })), createdAt: item.createdAt })),
+    suppliers: snapshot.suppliers.map((item): SupplierRecord => ({ id: item.id, name: item.name, phone: item.phone, city: '', email: '', categories: '', note: '', totalPurchasesRupees: item.totalPurchasesPaisa / 100, totalPaidRupees: item.totalPaidPaisa / 100, outstandingRupees: item.outstandingPaisa / 100, lastPurchaseDate: item.lastPurchaseDate, status: item.isActive ? 'Active' : 'Inactive' })),
+    supplierPayments: snapshot.payments.map((item): SupplierPaymentRecord => ({ id: item.id, supplierId: item.supplierId, date: item.businessDate, method: item.method, amountRupees: item.amountPaisa / 100, reference: item.reference, createdAt: item.createdAt })),
+    supplierLedger: snapshot.supplierLedger.map((item): SupplierLedgerEntry => ({ id: item.id, supplierId: item.supplierId, date: item.businessDate, type: item.type as SupplierLedgerEntry['type'], reference: item.reference, debitRupees: item.debitPaisa / 100, creditRupees: item.creditPaisa / 100, balanceAfterRupees: item.balanceAfterPaisa / 100, createdAt: item.occurredAt })),
+  }
+}
 
 export function RetailDataProvider({ children }: { children: ReactNode }) {
-  const [snapshot,setSnapshot] = useState(loadRetailData)
-  useEffect(() => saveRetailData(snapshot), [snapshot])
+  const [snapshot, setSnapshot] = useState<ViewData>(empty)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const busyRef = useRef(false)
+  const refreshVersion = useRef(0)
+  const [legacyDataAvailable] = useState(() => {
+    try { return window.localStorage.getItem('vertexia.product-inventory.v1') !== null } catch { return false }
+  })
 
-  const value = useMemo<RetailDataContextValue>(() => ({
-    products: snapshot.products,
-    movements: snapshot.movements,
-    purchases: snapshot.purchases,
-    suppliers: snapshot.suppliers,
-    supplierPayments: snapshot.supplierPayments,
-    supplierLedger: snapshot.supplierLedger,
-    cashTransactions: snapshot.cashTransactions,
-    saveProduct: (draft: ProductDraft, productId?: string) => {
-      const barcode = draft.barcode.trim()
-      if (snapshot.products.some(product => product.id !== productId && barcode && product.barcode === barcode)) return { ok:false, error:'Barcode already belongs to another product.' }
-      if (!draft.name.trim()) return { ok:false, error:'Product name is required.' }
-      if (!draft.category) return { ok:false, error:'Category is required.' }
-      if (draft.sellingPriceRupees <= 0) return { ok:false, error:'Selling price must be greater than zero.' }
-      const timestamp = new Date().toISOString()
-      const existing = productId ? snapshot.products.find(product => product.id === productId) : undefined
-      const product: ProductRecord = existing
-        ? { ...existing, ...draft, barcode, kind: draft.kind ?? existing.kind, updatedAt: timestamp }
-        : { ...draft, id:createId('product'), kind:draft.kind ?? 'box', barcode, createdAt:timestamp, updatedAt:timestamp }
-      const opening: InventoryMovementRecord | null = !existing && product.stock > 0 ? {
-        id:createId('movement'), productId:product.id, productName:product.name, type:'opening_stock',
-        quantityDelta:product.stock, balanceAfter:product.stock, reason:'Opening stock from product creation', createdAt:timestamp,
-      } : null
-      setSnapshot(current => ({ ...current,
-        products: existing ? current.products.map(item => item.id === product.id ? product : item) : [product,...current.products],
-        movements: opening ? [opening,...current.movements] : current.movements,
-      }))
-      return { ok:true, product }
-    },
-    toggleProductStatus: productId => setSnapshot(current => ({ ...current, products:current.products.map(product => product.id === productId ? { ...product, status:product.status === 'active' ? 'inactive' : 'active', updatedAt:new Date().toISOString() } : product) })),
-    adjustStock: (productId,quantityDelta,reason) => {
-      const product = snapshot.products.find(item => item.id === productId)
-      if (!product) return { ok:false, error:'Select a valid product.' }
-      if (!Number.isFinite(quantityDelta) || quantityDelta === 0) return { ok:false, error:'Adjustment quantity must be greater than zero.' }
-      const balance = product.stock + quantityDelta
-      if (balance < 0) return { ok:false, error:'Adjustment cannot reduce stock below zero.' }
-      if (!reason.trim()) return { ok:false, error:'Adjustment reason is required.' }
-      const timestamp = new Date().toISOString()
-      const movement: InventoryMovementRecord = { id:createId('movement'), productId, productName:product.name, type:quantityDelta > 0 ? 'adjustment_increase' : 'adjustment_decrease', quantityDelta, balanceAfter:balance, reason:reason.trim(), createdAt:timestamp }
-      setSnapshot(current => ({ ...current, products:current.products.map(item => item.id === productId ? { ...item, stock:balance, updatedAt:timestamp } : item), movements:[movement,...current.movements] }))
-      return { ok:true }
-    },
-    receivePurchase: (draft: PurchaseDraft) => {
-      if (!draft.supplier.trim()) return { ok:false, error:'Supplier is required.' }
-      if (!draft.items.length) return { ok:false, error:'Add at least one purchase item.' }
-      if (draft.items.some(item => !item.productId || item.quantity <= 0 || item.unitCostRupees <= 0)) return { ok:false, error:'Every item needs a product, quantity and purchase cost.' }
-      if (new Set(draft.items.map(item => item.productId)).size !== draft.items.length) return { ok:false, error:'Add each product only once per purchase.' }
-      const total = draft.items.reduce((sum,item) => sum + item.quantity * item.unitCostRupees,0)
-      if (draft.paidAmountRupees < 0 || draft.paidAmountRupees > total) return { ok:false, error:'Paid amount must be between zero and the purchase total.' }
-      const timestamp = new Date().toISOString()
-      const id = createId('purchase')
-      const paid = draft.paidAmountRupees
-      const due = total - paid
-      const status: PurchaseStatus = due === 0 ? 'Paid' : paid === 0 ? 'Unpaid' : 'Partial'
-      const purchaseNumber = `PUR-${new Date().getFullYear()}-${String(snapshot.purchases.length + 1).padStart(3,'0')}`
-      const purchase: PurchaseRecord = { id,purchaseNumber,supplier:draft.supplier.trim(),supplierInvoiceNumber:draft.supplierInvoiceNumber.trim(),purchaseDate:draft.purchaseDate,itemCount:draft.items.length,totalAmountRupees:total,paidAmountRupees:paid,dueAmountRupees:due,status,items:draft.items.map(item => ({ ...item })),createdAt:timestamp }
-      const supplierMatch = snapshot.suppliers.find(supplier => supplier.name.toLowerCase() === purchase.supplier.toLowerCase())
-      const supplierId = supplierMatch?.id ?? createId('supplier')
-      const supplier: SupplierRecord = supplierMatch ? {
-        ...supplierMatch, totalPurchasesRupees:supplierMatch.totalPurchasesRupees + total,
-        totalPaidRupees:supplierMatch.totalPaidRupees + paid, outstandingRupees:supplierMatch.outstandingRupees + due,
-        lastPurchaseDate:draft.purchaseDate,
-      } : { id:supplierId,name:purchase.supplier,phone:'',city:'Karachi',email:'',categories:'General',note:'Created from purchase receiving',totalPurchasesRupees:total,totalPaidRupees:paid,outstandingRupees:due,lastPurchaseDate:draft.purchaseDate,status:'Active' }
-      const updatedProducts = snapshot.products.map(product => {
-        const lines = draft.items.filter(item => item.productId === product.id)
-        if (!lines.length) return product
-        const added = lines.reduce((sum,line) => sum + line.quantity,0)
-        const latestCost = lines.at(-1)?.unitCostRupees ?? product.purchasePriceRupees
-        return { ...product, stock:product.stock + added, purchasePriceRupees:latestCost, updatedAt:timestamp }
-      })
-      const movements = draft.items.map(item => {
-        const product = snapshot.products.find(entry => entry.id === item.productId)!
-        return { id:createId('movement'), productId:product.id, productName:product.name, type:'purchase' as const, quantityDelta:item.quantity, balanceAfter:product.stock + item.quantity, reason:`Purchase received from ${purchase.supplier}`, referenceId:id, createdAt:timestamp }
-      })
-      const purchaseBalance = (supplierMatch?.outstandingRupees ?? 0) + total
-      const purchaseLedger: SupplierLedgerEntry = { id:createId('supplier-ledger'),supplierId,date:draft.purchaseDate,type:'purchase',reference:purchaseNumber,debitRupees:total,creditRupees:0,balanceAfterRupees:purchaseBalance,createdAt:timestamp }
-      const paymentId = paid > 0 ? createId('supplier-payment') : ''
-      const payment: SupplierPaymentRecord | null = paid > 0 ? { id:paymentId,supplierId,date:draft.purchaseDate,method:draft.paymentMethod,amountRupees:paid,reference:purchaseNumber,createdAt:timestamp } : null
-      const paymentLedger: SupplierLedgerEntry | null = paid > 0 ? { id:createId('supplier-ledger'),supplierId,date:draft.purchaseDate,type:'payment',reference:purchaseNumber,debitRupees:0,creditRupees:paid,balanceAfterRupees:purchaseBalance - paid,createdAt:timestamp } : null
-      const cashTransaction: CashTransactionRecord | null = payment && draft.paymentMethod === 'Cash' ? { id:createId('cash-transaction'),type:'supplier_payment',amountRupees:paid,referenceId:payment.id,description:`Purchase payment to ${supplier.name}`,createdAt:timestamp } : null
-      setSnapshot(current => ({ ...current,
-        products:updatedProducts, movements:[...movements,...current.movements], purchases:[purchase,...current.purchases],
-        suppliers:supplierMatch ? current.suppliers.map(item => item.id === supplierId ? supplier : item) : [supplier,...current.suppliers],
-        supplierPayments:payment ? [payment,...current.supplierPayments] : current.supplierPayments,
-        supplierLedger:paymentLedger ? [paymentLedger,purchaseLedger,...current.supplierLedger] : [purchaseLedger,...current.supplierLedger],
-        cashTransactions:cashTransaction ? [cashTransaction,...current.cashTransactions] : current.cashTransactions,
-      }))
-      return { ok:true }
-    },
-    paySupplier: (supplierId: string,amountRupees: number,method: SupplierPaymentMethod,reference: string) => {
-      const supplier = snapshot.suppliers.find(item => item.id === supplierId)
-      if (!supplier) return { ok:false,error:'Select a valid supplier.' }
-      if (!Number.isFinite(amountRupees) || amountRupees <= 0) return { ok:false,error:'Payment amount must be greater than zero.' }
-      if (amountRupees > supplier.outstandingRupees) return { ok:false,error:'Payment cannot exceed supplier outstanding.' }
-      const timestamp = new Date().toISOString()
-      const date = timestamp.slice(0,10)
-      const payment: SupplierPaymentRecord = { id:createId('supplier-payment'),supplierId,date,method,amountRupees,reference:reference.trim(),createdAt:timestamp }
-      const balance = supplier.outstandingRupees - amountRupees
-      const ledger: SupplierLedgerEntry = { id:createId('supplier-ledger'),supplierId,date,type:'payment',reference:reference.trim() || payment.id,debitRupees:0,creditRupees:amountRupees,balanceAfterRupees:balance,createdAt:timestamp }
-      const cashTransaction: CashTransactionRecord | null = method === 'Cash' ? { id:createId('cash-transaction'),type:'supplier_payment',amountRupees,referenceId:payment.id,description:`Payment to ${supplier.name}`,createdAt:timestamp } : null
-      setSnapshot(current => ({ ...current,
-        suppliers:current.suppliers.map(item => item.id === supplierId ? { ...item,totalPaidRupees:item.totalPaidRupees + amountRupees,outstandingRupees:balance } : item),
-        supplierPayments:[payment,...current.supplierPayments], supplierLedger:[ledger,...current.supplierLedger],
-        cashTransactions:cashTransaction ? [cashTransaction,...current.cashTransactions] : current.cashTransactions,
-      }))
-      return { ok:true }
-    },
-  }), [snapshot])
+  const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current
+    if (!window.vertexia?.retail) {
+      setError('Desktop database is unavailable. Start Vertexia with npm run dev:desktop.')
+      setLoading(false)
+      return
+    }
+    try {
+      const result = await window.vertexia.retail.getSnapshot(branchId)
+      if (version !== refreshVersion.current) return
+      setSnapshot(view(result)); setError('')
+    } catch (cause) {
+      if (version === refreshVersion.current) setError(cause instanceof Error ? cause.message : 'Retail records could not be loaded.')
+    } finally { if (version === refreshVersion.current) setLoading(false) }
+  }, [])
 
-  return <RetailDataContext.Provider value={value}>{children}</RetailDataContext.Provider>
+  const invalidateRefresh = useCallback(() => { refreshVersion.current++ }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void refresh(), 0)
+    const reload = () => void refresh()
+    window.addEventListener(RETAIL_DATA_CHANGED, reload)
+    window.addEventListener('focus', reload)
+    return () => { window.clearTimeout(timer); window.removeEventListener(RETAIL_DATA_CHANGED, reload); window.removeEventListener('focus', reload); invalidateRefresh() }
+  }, [refresh, invalidateRefresh])
+
+  const run = async (operation: () => Promise<unknown>): Promise<OperationResult> => {
+    if (busyRef.current) return { ok: false, error: 'Another operation is still being posted. Please wait.' }
+    if (!window.vertexia?.retail) return { ok: false, error: 'The desktop database is unavailable.' }
+    busyRef.current = true; setBusy(true)
+    try {
+      await operation()
+      await refresh()
+      notifyRetailDataChanged()
+      return { ok: true }
+    } catch (cause) {
+      return { ok: false, error: cause instanceof Error ? cause.message : 'The operation could not be posted.' }
+    } finally { busyRef.current = false; setBusy(false) }
+  }
+
+  const adjustStock = (productId: string, delta: number, reason: string, operationId: string) => run(() => window.vertexia!.retail.adjustStock({ branchId, operationId, productId, quantityDeltaMilli: toFixedUnits(delta, 1000, 'Quantity'), reason }))
+  const receivePurchase = (draft: PurchaseDraft, operationId: string) => run(() => window.vertexia!.retail.receivePurchase({ branchId, operationId, supplierName: draft.supplier, supplierInvoiceNumber: draft.supplierInvoiceNumber, businessDate: draft.purchaseDate, paidAmountPaisa: toFixedUnits(draft.paidAmountRupees, 100, 'Paid amount'), paymentMethod: draft.paymentMethod, lines: draft.items.map(line => ({ productId: line.productId, quantityMilli: toFixedUnits(line.quantity, 1000, 'Quantity'), unitCostPaisa: toFixedUnits(line.unitCostRupees, 100, 'Unit cost') })) }))
+  const paySupplier = (supplierId: string, amount: number, method: SupplierPaymentMethod, reference: string, operationId: string) => run(() => window.vertexia!.retail.paySupplier({ branchId, operationId, supplierId, amountPaisa: toFixedUnits(amount, 100, 'Payment'), method, reference }))
+
+  return <RetailDataContext.Provider value={{ ...snapshot, loading, busy, error, legacyDataAvailable, refresh, adjustStock, receivePurchase, paySupplier }}>{children}</RetailDataContext.Provider>
 }

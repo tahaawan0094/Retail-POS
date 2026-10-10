@@ -1,6 +1,6 @@
 ﻿# Vertexia Retail POS
 
-Responsive desktop retail POS for Pakistani marts and stores. The approved UI is preserved while each module is being moved to a local, transactional SQLite database. Dashboard, POS and Products are currently database-backed.
+Responsive desktop retail POS for Pakistani marts and stores. Dashboard, POS, Products, Sales, Inventory, Purchases and Suppliers share the local transactional SQLite database. Commercial authentication, backup/restore, cloud synchronization and licensing remain separate implementation milestones.
 
 ## Technology
 
@@ -31,6 +31,8 @@ npm run dev:desktop
 npm run build
 npm run lint
 npm run test:dashboard
+npm run test:database
+npm run test:desktop:retail
 ```
 
 Use `npm run dev:desktop` for functional development. `npm run dev` only opens the browser frontend and cannot access the local SQLite database.
@@ -45,8 +47,18 @@ Products provides SQLite-backed creation and editing, opening stock, active/inac
 
 A new production database starts with zero transactions and no demo products. Database integration tests create isolated fixtures that are never written to the user's application database.
 
+Inventory displays stock and movements from the same database used by POS. Purchase receiving atomically records purchase items, incoming stock, supplier liability, optional payment, cash outflow and audit history. Cash supplier payments require an open POS shift. Later supplier payments allocate to the oldest unpaid purchases and update their outstanding amounts.
+
+Sales displays real invoices, filters, analytics, invoice details, print/reprint and saleable-item returns. Sales, returns, purchases, adjustments and supplier payments support persisted operation identifiers: retrying the same request returns its original result without posting again. Desktop forms retain pending retry identifiers separately from their financial records. Human document sequences are durable and no longer based on transaction counts.
+
+Existing browser records under `vertexia.product-inventory.v1` are preserved, but are no longer a source of stock or financial postings. Inventory, Purchases and Suppliers show a download option when older browser records exist. There is no automatic import: mixed demo and user records need reconciliation before an explicit migration. Startup no longer deletes existing SQLite records based on a legacy demo marker.
+
+The offline desktop smoke test uses a separate temporary database and disables Electron networking. It submits purchase, return, adjustment and supplier-payment forms and checks their effects against POS, invoice status and the cash drawer.
+
+See [Milestone 1 implementation notes](docs/architecture/milestone-1-shared-retail-database.md) for manual verification, data-migration details and remaining limits.
+
 For development inspection, the SQLite file is stored at `%APPDATA%/Vertexia Retail POS Development/data/vertexia.db`. It can be opened read-only with DB Browser for SQLite or SQLiteStudio while the application is running. Close Vertexia before manually changing the database.
 
 ## Implementation direction
 
-Build the remaining transactional modules one at a time: Sales, Inventory, Suppliers and Purchases, Customers and ledgers, Cash and Expenses, Reports and configuration, then desktop hardware and synchronization. Installer packaging is intentionally reserved for the final completed application.
+Next implement real business onboarding and authenticated user/branch permissions, then complete Customers, Cash/shift closing, Expenses, valuation, backup/restore and reports. Cloud synchronization, company licensing, multi-counter/branch operation and installer distribution follow their own acceptance gates. Current default business/user IDs are development setup, not a completed access-control model.

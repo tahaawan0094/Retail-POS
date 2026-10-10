@@ -17,6 +17,7 @@ export type PurchaseDraft = {
 
 export type PurchaseRecord = {
   id: string
+  supplierId?: string
   purchaseNumber: string
   supplier: string
   supplierInvoiceNumber: string

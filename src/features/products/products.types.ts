@@ -29,7 +29,7 @@ export type InventoryMovementRecord = {
   id: string
   productId: string
   productName: string
-  type: 'opening_stock' | 'purchase' | 'adjustment_increase' | 'adjustment_decrease'
+  type: string
   quantityDelta: number
   balanceAfter: number
   reason: string

@@ -31,6 +31,8 @@ import type {
   SalesSnapshot,
 } from '../../src/types/desktop-api.js'
 import { migrations } from './schema.mjs'
+import { RetailRepository } from './retail.mjs'
+import { nextDocumentNumber, postOperation, requireSafeInteger } from './posting.mjs'
 
 type SqlRow = Record<string, string | number | null>
 
@@ -114,37 +116,6 @@ function runMigrations(db: DatabaseSync) {
       db.exec('ROLLBACK')
       throw error
     }
-  }
-}
-
-function removeLegacyDemoSeed(db: DatabaseSync) {
-  const demoSeed = db.prepare("SELECT value FROM app_meta WHERE key='seeded_business_date'").get()
-  if (!demoSeed) return
-
-  db.exec('BEGIN IMMEDIATE')
-  try {
-    db.exec(`
-      DELETE FROM audit_events;
-      DELETE FROM cash_transactions;
-      DELETE FROM cash_shifts;
-      DELETE FROM expenses;
-      DELETE FROM supplier_ledger;
-      DELETE FROM customer_ledger;
-      DELETE FROM sale_payments;
-      DELETE FROM sale_items;
-      DELETE FROM sales;
-      DELETE FROM stock_movements;
-      DELETE FROM stock_levels;
-      DELETE FROM products;
-      DELETE FROM suppliers;
-      DELETE FROM customers WHERE is_walk_in = 0;
-      DELETE FROM app_meta WHERE key = 'seeded_business_date';
-      INSERT OR REPLACE INTO app_meta(key,value) VALUES ('demo_seed_removed','1');
-    `)
-    db.exec('COMMIT')
-  } catch (error) {
-    db.exec('ROLLBACK')
-    throw error
   }
 }
 
@@ -291,6 +262,7 @@ function chartDates(today: string, period: DashboardChartPeriod) {
 
 export class VertexiaDatabase {
   readonly connection: DatabaseSync
+  readonly retail: RetailRepository
   private readonly now: () => Date
 
   constructor(path: string, now: () => Date = () => new Date(), options: { seedDemoData?: boolean } = {}) {
@@ -298,8 +270,8 @@ export class VertexiaDatabase {
     this.connection = new DatabaseSync(path)
     this.now = now
     runMigrations(this.connection)
-    removeLegacyDemoSeed(this.connection)
     seedDatabase(this.connection, this.now(),options.seedDemoData === true)
+    this.retail = new RetailRepository(this.connection, BUSINESS_ID, OWNER_ID, this.now)
   }
 
   close() {
@@ -311,7 +283,9 @@ export class VertexiaDatabase {
     const selectedBranch = this.connection.prepare('SELECT id FROM branches WHERE id=? AND is_active=1').get(query.branchId) as SqlRow | undefined
     const branchId = String(selectedBranch?.id ?? BRANCH_ID)
     const range = resolveRange(today, query.dateRange)
-    const total = (start: string, end: string) => this.connection.prepare(`SELECT COALESCE(SUM(total_paisa),0) AS sales, COALESCE(SUM(total_paisa-cost_paisa),0) AS profit FROM sales WHERE branch_id=? AND status='completed' AND business_date BETWEEN ? AND ?`).get(branchId, start, end) as SqlRow
+    const saleFacts = `(SELECT branch_id,business_date,completed_at AS occurred_at,total_paisa AS amount,cost_paisa AS cost FROM sales WHERE status<>'voided'
+      UNION ALL SELECT branch_id,date(occurred_at,'+5 hours'),occurred_at,-total_paisa,-cost_paisa FROM sale_returns)`
+    const total = (start: string, end: string) => this.connection.prepare(`SELECT COALESCE(SUM(amount),0) AS sales, COALESCE(SUM(amount-cost),0) AS profit FROM ${saleFacts} WHERE branch_id=? AND business_date BETWEEN ? AND ?`).get(branchId, start, end) as SqlRow
     const current = total(range.start, range.end)
     const previous = total(range.previousStart, range.previousEnd)
     const scalar = (sql: string, ...params: (string | number)[]) => Number((this.connection.prepare(sql).get(...params) as SqlRow | undefined)?.value ?? 0)
@@ -319,7 +293,7 @@ export class VertexiaDatabase {
 
     let chart: DashboardChartPoint[]
     if (query.chartPeriod === 'today') {
-      const rows = this.connection.prepare(`SELECT CAST(substr(completed_at,12,2) AS INTEGER) AS hour, SUM(total_paisa) AS value, SUM(total_paisa-cost_paisa) AS profit FROM sales WHERE branch_id=? AND status='completed' AND business_date=? GROUP BY hour`).all(branchId, today) as SqlRow[]
+      const rows = this.connection.prepare(`SELECT CAST(strftime('%H',occurred_at,'+5 hours') AS INTEGER) AS hour, SUM(amount) AS value, SUM(amount-cost) AS profit FROM ${saleFacts} WHERE branch_id=? AND business_date=? GROUP BY hour`).all(branchId, today) as SqlRow[]
       const hourly = new Map(rows.map(row => [Number(row.hour), { value:Number(row.value),profit:Number(row.profit) }]))
       chart = [8,10,12,14,16,18,20].map(hour => {
         const bucket = Array.from(hourly).filter(([saleHour]) => saleHour >= hour && saleHour < hour + 2).reduce((sum,[,value]) => ({ value:sum.value+value.value,profit:sum.profit+value.profit }),{ value:0,profit:0 })
@@ -327,7 +301,7 @@ export class VertexiaDatabase {
       })
     } else {
       const dates = chartDates(today, query.chartPeriod)
-      const rows = this.connection.prepare(`SELECT business_date AS date, SUM(total_paisa) AS value, SUM(total_paisa-cost_paisa) AS profit FROM sales WHERE branch_id=? AND status='completed' AND business_date BETWEEN ? AND ? GROUP BY business_date`).all(branchId, dates[0], dates.at(-1)!) as SqlRow[]
+      const rows = this.connection.prepare(`SELECT business_date AS date, SUM(amount) AS value, SUM(amount-cost) AS profit FROM ${saleFacts} WHERE branch_id=? AND business_date BETWEEN ? AND ? GROUP BY business_date`).all(branchId, dates[0], dates.at(-1)!) as SqlRow[]
       const values = new Map(rows.map(row => [String(row.date), { value:Number(row.value),profit:Number(row.profit) }]))
       chart = dates.map(date => ({ label:labelDate(date),valuePaisa:values.get(date)?.value ?? 0,profitPaisa:values.get(date)?.profit ?? 0 }))
     }
@@ -384,11 +358,13 @@ export class VertexiaDatabase {
     return lines.map(line => {
       if (!line || typeof line.productId !== 'string' || seen.has(line.productId)) throw new Error('Cart contains an invalid or duplicate product.')
       seen.add(line.productId)
-      if (!Number.isInteger(line.quantityMilli) || line.quantityMilli <= 0) throw new Error('Product quantity must be greater than zero.')
+      if (!Number.isSafeInteger(line.quantityMilli) || line.quantityMilli <= 0) throw new Error('Product quantity must be greater than zero.')
       if (!Number.isInteger(line.discountBasisPoints) || line.discountBasisPoints < 0 || line.discountBasisPoints > 10_000) throw new Error('Product discount must be between 0% and 100%.')
       const row = this.connection.prepare(`SELECT p.id,p.name,p.sku,p.barcode,p.unit,p.visual_kind,p.purchase_price_paisa,p.selling_price_paisa,sl.quantity_milli FROM products p JOIN stock_levels sl ON sl.product_id=p.id AND sl.branch_id=? WHERE p.id=? AND p.is_active=1`).get(branchId,line.productId) as SqlRow | undefined
       if (!row) throw new Error('A cart product is no longer available.')
       if (Number(row.quantity_milli) < line.quantityMilli) throw new Error(`${String(row.name)} has insufficient stock.`)
+      requireSafeInteger(Number(row.selling_price_paisa) * line.quantityMilli, 'Sale calculation')
+      requireSafeInteger(Number(row.purchase_price_paisa) * line.quantityMilli, 'Cost calculation')
       const subtotalPaisa = Math.round(Number(row.selling_price_paisa) * line.quantityMilli / 1000)
       const costPaisa = Math.round(Number(row.purchase_price_paisa) * line.quantityMilli / 1000)
       const discountPaisa = Math.round(subtotalPaisa * line.discountBasisPoints / 10_000)
@@ -402,8 +378,7 @@ export class VertexiaDatabase {
     if (!request || typeof request.branchId !== 'string' || typeof request.customerId !== 'string') throw new Error('Invalid sale request.')
     const allowedMethods = new Set(['Cash','Card','JazzCash','Easypaisa','Udhaar'])
     if (!allowedMethods.has(request.paymentMethod)) throw new Error('Select a valid payment method.')
-    this.connection.exec('BEGIN IMMEDIATE')
-    try {
+    return postOperation(this.connection, request.branchId, request.operationId, 'sale.post', request, this.now().toISOString(), () => {
       const branch = this.connection.prepare('SELECT business_id FROM branches WHERE id=? AND is_active=1').get(request.branchId) as SqlRow | undefined
       if (!branch) throw new Error('The selected branch is unavailable.')
       const shift = this.connection.prepare(`SELECT id FROM cash_shifts WHERE branch_id=? AND status='open' ORDER BY opened_at DESC LIMIT 1`).get(request.branchId) as SqlRow | undefined
@@ -417,12 +392,14 @@ export class VertexiaDatabase {
       const totalPaisa = lines.reduce((sum,line) => sum + line.lineTotalPaisa,0)
       const costPaisa = lines.reduce((sum,line) => sum + line.costPaisa,0)
       if (totalPaisa <= 0) throw new Error('Sale total must be greater than zero.')
-      if (request.paymentMethod === 'Cash' && (!Number.isInteger(request.cashReceivedPaisa) || request.cashReceivedPaisa < totalPaisa)) throw new Error('Cash received is less than the sale total.')
+      requireSafeInteger(subtotalPaisa, 'Sale subtotal')
+      requireSafeInteger(totalPaisa, 'Sale total', 1)
+      requireSafeInteger(costPaisa, 'Sale cost')
+      if (request.paymentMethod === 'Cash' && (!Number.isSafeInteger(request.cashReceivedPaisa) || request.cashReceivedPaisa < totalPaisa)) throw new Error('Cash received is less than the sale total.')
       const now = this.now()
       const date = businessDate(now)
       const completedAt = now.toISOString()
-      const sequence = Number((this.connection.prepare(`SELECT COUNT(*) AS value FROM sales WHERE branch_id=? AND business_date=?`).get(request.branchId,date) as SqlRow).value) + 1
-      const invoiceNumber = `SAL-${date.replaceAll('-','')}-${String(sequence).padStart(4,'0')}`
+      const invoiceNumber = nextDocumentNumber(this.connection, request.branchId, 'sale', date)
       const saleId = `sale-${randomUUID()}`
       this.connection.prepare('INSERT INTO sales VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(saleId,String(branch.business_id),request.branchId,invoiceNumber,date,request.customerId,OWNER_ID,subtotalPaisa,discountPaisa,totalPaisa,costPaisa,'completed',completedAt)
       const insertItem = this.connection.prepare('INSERT INTO sale_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -439,13 +416,9 @@ export class VertexiaDatabase {
       if (request.paymentMethod === 'Udhaar') this.connection.prepare('INSERT INTO customer_ledger VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(`customer-ledger-${randomUUID()}`,request.branchId,request.customerId,'sale',totalPaisa,0,saleId,completedAt)
       if (request.paymentMethod === 'Cash') this.connection.prepare('INSERT INTO cash_transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`cash-${randomUUID()}`,String(shift.id),request.branchId,date,'cash_sale','in',totalPaisa,'Cash',saleId,completedAt)
       this.connection.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`audit-${randomUUID()}`,request.branchId,OWNER_ID,'Sale','sale',saleId,'Sale completed',invoiceNumber,completedAt)
-      this.connection.exec('COMMIT')
       const cashReceivedPaisa = request.paymentMethod === 'Cash' ? request.cashReceivedPaisa : totalPaisa
       return { saleId,invoiceNumber,completedAt,customerName:String(customer.name),paymentMethod:request.paymentMethod,subtotalPaisa,discountPaisa,totalPaisa,cashReceivedPaisa,changePaisa:request.paymentMethod === 'Cash' ? cashReceivedPaisa-totalPaisa : 0,lines:lines.map(line => ({ name:line.name,quantityMilli:line.quantityMilli,unitPricePaisa:line.unitPricePaisa,discountPaisa:line.discountPaisa,lineTotalPaisa:line.lineTotalPaisa })) }
-    } catch (error) {
-      this.connection.exec('ROLLBACK')
-      throw error
-    }
+    })
   }
 
   holdPosSale(branchId: string, customerId: string, lines: PosCartLineInput[]): PosHeldSale {
@@ -746,8 +719,7 @@ export class VertexiaDatabase {
     const reason=request.reason?.trim()
     if(!reason||reason.length<3||reason.length>250) throw new Error('Enter a return reason between 3 and 250 characters.')
     if(!Array.isArray(request.lines)||!request.lines.length) throw new Error('Select at least one item to return.')
-    this.connection.exec('BEGIN IMMEDIATE')
-    try {
+    return postOperation(this.connection, request.branchId, request.operationId, 'sale.return', request, this.now().toISOString(), () => {
       const sale=this.connection.prepare(`SELECT s.id,s.status,s.customer_id,s.business_date,(SELECT method FROM sale_payments WHERE sale_id=s.id LIMIT 1) AS payment_method FROM sales s WHERE s.id=? AND s.branch_id=?`).get(request.saleId,request.branchId) as SqlRow|undefined
       if(!sale) throw new Error('Sale was not found.')
       if(String(sale.status)==='voided') throw new Error('A voided sale cannot be returned.')
@@ -771,8 +743,7 @@ export class VertexiaDatabase {
       const now=this.now(),occurredAt=now.toISOString(),date=businessDate(now)
       let shift:SqlRow|undefined
       if(paymentMethod==='Cash'){shift=this.connection.prepare(`SELECT id FROM cash_shifts WHERE branch_id=? AND status='open' ORDER BY opened_at DESC LIMIT 1`).get(request.branchId) as SqlRow|undefined;if(!shift)throw new Error('Open a cash shift before issuing a cash refund.')}
-      const sequence=scalarValue(this.connection,`SELECT COUNT(*) AS value FROM sale_returns WHERE branch_id=? AND date(occurred_at,'+5 hours')=?`,request.branchId,date)+1
-      const returnId=`sale-return-${randomUUID()}`,returnNumber=`RET-${date.replaceAll('-','')}-${String(sequence).padStart(4,'0')}`
+      const returnId=`sale-return-${randomUUID()}`,returnNumber=nextDocumentNumber(this.connection,request.branchId,'return',date)
       this.connection.prepare('INSERT INTO sale_returns VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(returnId,request.saleId,request.branchId,returnNumber,reason,paymentMethod,totalPaisa,costPaisa,OWNER_ID,occurredAt)
       const insertItem=this.connection.prepare('INSERT INTO sale_return_items VALUES (?, ?, ?, ?, ?, ?, ?)')
       for(const line of lines){insertItem.run(`sale-return-item-${randomUUID()}`,returnId,line.id,line.productId,line.quantityMilli,line.refundPaisa,line.costPaisa);this.connection.prepare('UPDATE stock_levels SET quantity_milli=quantity_milli+?,updated_at=? WHERE branch_id=? AND product_id=?').run(line.quantityMilli,occurredAt,request.branchId,line.productId);const stock=this.connection.prepare('SELECT quantity_milli FROM stock_levels WHERE branch_id=? AND product_id=?').get(request.branchId,line.productId) as SqlRow;this.connection.prepare('INSERT INTO stock_movements VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`stock-${randomUUID()}`,request.branchId,line.productId,'sale_return',line.quantityMilli,Number(stock.quantity_milli),'sale_return',returnId,returnNumber,occurredAt)}
@@ -781,9 +752,8 @@ export class VertexiaDatabase {
       const remaining=scalarValue(this.connection,`SELECT COALESCE(SUM(si.quantity_milli-COALESCE((SELECT SUM(sri.quantity_milli) FROM sale_return_items sri WHERE sri.sale_item_id=si.id),0)),0) AS value FROM sale_items si WHERE si.sale_id=?`,request.saleId)
       if(remaining===0)this.connection.prepare(`UPDATE sales SET status='returned' WHERE id=?`).run(request.saleId)
       this.connection.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`audit-${randomUUID()}`,request.branchId,OWNER_ID,'Sale Return','sale_return',returnId,'Sale return completed',`${returnNumber} · ${String((this.connection.prepare('SELECT invoice_number FROM sales WHERE id=?').get(request.saleId) as SqlRow).invoice_number)}`,occurredAt)
-      this.connection.exec('COMMIT')
       return{returnId,returnNumber,refundMethod:paymentMethod,totalPaisa,occurredAt}
-    }catch(error){this.connection.exec('ROLLBACK');throw error}
+    })
   }
 
   exportSalesCsv(query:SalesListQuery) {

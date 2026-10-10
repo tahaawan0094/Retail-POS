@@ -131,6 +131,7 @@ export type PosBootstrap = {
 }
 
 export type PosCompleteSaleRequest = {
+  operationId?: string
   branchId: string
   customerId: string
   lines: PosCartLineInput[]
@@ -261,12 +262,39 @@ export type SalesDetail = SalesListRow & {
   businessName:string;branchName:string;lines:SalesDetailLine[];returns:SalesReturnRecord[]
 }
 export type SalesReturnRequest = {
+  operationId?:string
   branchId:string;saleId:string;reason:string
   lines:Array<{saleItemId:string;quantityMilli:number}>
 }
 export type SalesReturnResult = { returnId:string;returnNumber:string;refundMethod:string;totalPaisa:number;occurredAt:string }
 
+export type RetailPaymentMethod = 'Cash'|'Bank Transfer'|'JazzCash'|'Easypaisa'|'Card'
+export type StockAdjustmentRequest = { branchId:string;operationId:string;productId:string;quantityDeltaMilli:number;reason:string }
+export type PurchaseReceiveRequest = {
+  branchId:string;operationId:string;supplierName:string;supplierInvoiceNumber:string;businessDate:string
+  paidAmountPaisa:number;paymentMethod:RetailPaymentMethod
+  lines:Array<{productId:string;quantityMilli:number;unitCostPaisa:number}>
+}
+export type PurchaseReceiveResult = { purchaseId:string;purchaseNumber:string;supplierId:string;totalPaisa:number }
+export type SupplierPayRequest = { branchId:string;operationId:string;supplierId:string;amountPaisa:number;method:RetailPaymentMethod;reference:string }
+export type RetailSnapshot = {
+  branchId:string
+  businessDate:string
+  products:ProductCatalogRecord[]
+  movements:Array<{id:string;productId:string;productName:string;type:string;quantityDeltaMilli:number;balanceAfterMilli:number;reason:string;referenceId:string;occurredAt:string}>
+  purchases:Array<{id:string;supplierId:string;purchaseNumber:string;supplierName:string;supplierInvoiceNumber:string;businessDate:string;totalPaisa:number;paidPaisa:number;duePaisa:number;createdAt:string;lines:Array<{productId:string;quantityMilli:number;unitCostPaisa:number}>}>
+  suppliers:Array<{id:string;name:string;phone:string;isActive:boolean;totalPurchasesPaisa:number;totalPaidPaisa:number;outstandingPaisa:number;lastPurchaseDate:string|null}>
+  payments:Array<{id:string;supplierId:string;businessDate:string;method:RetailPaymentMethod;amountPaisa:number;reference:string;createdAt:string}>
+  supplierLedger:Array<{id:string;supplierId:string;businessDate:string;type:string;reference:string;debitPaisa:number;creditPaisa:number;balanceAfterPaisa:number;occurredAt:string}>
+}
+
 export type VertexiaDesktopApi = {
+  retail: {
+    getSnapshot(branchId:string):Promise<RetailSnapshot>
+    adjustStock(request:StockAdjustmentRequest):Promise<{movementId:string;balanceAfterMilli:number}>
+    receivePurchase(request:PurchaseReceiveRequest):Promise<PurchaseReceiveResult>
+    paySupplier(request:SupplierPayRequest):Promise<{paymentId:string;outstandingPaisa:number}>
+  }
   dashboard: {
     getSnapshot(query: DashboardQuery): Promise<DashboardSnapshot>
     search(term: string, branchId: string): Promise<GlobalSearchResult[]>

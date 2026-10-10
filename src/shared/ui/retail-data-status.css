@@ -1,0 +1,7 @@
+.retail-data-status { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:14px 0; padding:14px 18px; border-radius:12px; background:#eef4ff; color:#294d80; font-size:13px; line-height:1.5; }
+.retail-data-status.error { background:#fff0f0; color:#a52a39; }
+.retail-data-status.legacy { background:#fff7e7; color:#77501c; }
+.retail-data-status button { flex-shrink:0; border:1px solid currentColor; border-radius:7px; background:transparent; padding:7px 12px; color:inherit; cursor:pointer; }
+.purchase-filters > input,.purchase-filters > select { min-width:110px; max-width:170px; padding:10px 12px; border:1px solid #dce3ed; border-radius:7px; background:white; color:#385079; font:inherit; font-size:12px; }
+.inventory-tabs button:disabled,.purchase-tabs button:disabled,.purchase-quick-actions button:disabled,.add-customer:disabled { opacity:.5; cursor:not-allowed; }
+@media(max-width:640px) { .retail-data-status { align-items:flex-start; flex-direction:column; } }

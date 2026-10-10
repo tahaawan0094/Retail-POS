@@ -1,12 +1,15 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DashboardChartPeriod, DashboardDateRange, DashboardQuery, PosCompleteSaleRequest, PosCreateCustomerInput, PosCreateProductInput, PosCartLineInput, ProductCatalogQuery, ProductSaveInput, SalesListQuery, SalesReturnRequest } from '../src/types/desktop-api.js'
 import { VertexiaDatabase } from './database/database.mjs'
+import type { PurchaseReceiveRequest, StockAdjustmentRequest, SupplierPayRequest } from '../src/types/desktop-api.js'
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url))
 const developmentUrl = process.env.VITE_DEV_SERVER_URL
+const smokeTarget = process.env.VERTEXIA_SMOKE_TEST
+if (smokeTarget && process.env.VERTEXIA_SMOKE_USER_DATA) app.setPath('userData', process.env.VERTEXIA_SMOKE_USER_DATA)
 if (developmentUrl) app.setName('Vertexia Retail POS Development')
 
 const singleInstance = app.requestSingleInstanceLock()
@@ -33,6 +36,10 @@ function validateDashboardQuery(value: unknown): DashboardQuery {
 }
 
 function registerIpc() {
+  ipcMain.handle('retail:get-snapshot', (_event, branchId: unknown) => database!.retail.getSnapshot(requiredId(branchId)))
+  ipcMain.handle('retail:adjust-stock', (_event, request: unknown) => database!.retail.adjustStock(request as StockAdjustmentRequest))
+  ipcMain.handle('retail:receive-purchase', (_event, request: unknown) => database!.retail.receivePurchase(request as PurchaseReceiveRequest))
+  ipcMain.handle('retail:pay-supplier', (_event, request: unknown) => database!.retail.paySupplier(request as SupplierPayRequest))
   ipcMain.handle('dashboard:get-snapshot', (_event, query: unknown) => database!.getDashboardSnapshot(validateDashboardQuery(query)))
   ipcMain.handle('dashboard:search', (_event, term: unknown, branchId: unknown) => {
     if (typeof term !== 'string' || typeof branchId !== 'string') throw new Error('Invalid search request.')
@@ -83,8 +90,7 @@ function requiredInteger(value: unknown, label: string) {
 }
 
 async function createWindow() {
-  const smokeTarget = process.env.VERTEXIA_SMOKE_TEST
-  const initialHash = smokeTarget === 'pos' || smokeTarget === 'products' ? smokeTarget : 'dashboard'
+  const initialHash = smokeTarget === 'retail' ? 'purchases' : smokeTarget === 'pos' || smokeTarget === 'products' ? smokeTarget : 'dashboard'
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -98,6 +104,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !smokeTarget,
     },
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -111,10 +118,21 @@ async function createWindow() {
     const allowed = developmentUrl ? url.startsWith(developmentUrl) : url.startsWith('file:')
     if (!allowed) event.preventDefault()
   })
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  mainWindow.once('ready-to-show', () => { if (!smokeTarget) mainWindow?.show() })
   if (developmentUrl) await mainWindow.loadURL(`${developmentUrl}/#${initialHash}`)
   else await mainWindow.loadFile(join(moduleDirectory, '../../dist/index.html'), { hash:initialHash })
 
+  if (smokeTarget === 'retail') {
+    try {
+      await mainWindow.webContents.session.enableNetworkEmulation({ offline:true })
+      const script = await readFile(join(moduleDirectory, '../../scripts/retail-browser-smoke.js'), 'utf8')
+      const result = await mainWindow.webContents.executeJavaScript(script)
+      if (process.env.VERTEXIA_SMOKE_SCREENSHOT) await writeFile(process.env.VERTEXIA_SMOKE_SCREENSHOT, (await mainWindow.webContents.capturePage()).toPNG())
+      console.log('VERTEXIA_RETAIL_SMOKE',JSON.stringify(result))
+      app.exit(0)
+    } catch(error) { console.error('VERTEXIA_RETAIL_SMOKE_FAILED',error);app.exit(1) }
+    return
+  }
   if (smokeTarget) {
     const result = await mainWindow.webContents.executeJavaScript(`new Promise(resolve => {
       let attempts = 0;

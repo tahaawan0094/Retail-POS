@@ -1,6 +1,7 @@
-import { useCallback,useEffect,useMemo,useState } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import type { PosBootstrap,PosCartLineInput,PosCompletedSale,PosCreateCustomerInput,PosCreateProductInput,PosPaymentMethod,PosProduct } from '../../types/desktop-api'
-import type { ProductRecord } from '../products/products.types'
+import { useOperationIdentity } from '../../shared/hooks/useOperationIdentity'
+import { notifyRetailDataChanged } from '../../services/retail-events'
 
 export type PosCartLine = PosProduct & { quantityInCartMilli:number;discountBasisPoints:number }
 
@@ -8,24 +9,9 @@ const lineSubtotal = (line: PosCartLine) => Math.round(line.sellingPricePaisa * 
 export const lineDiscount = (line: PosCartLine) => Math.round(lineSubtotal(line) * line.discountBasisPoints / 10_000)
 export const lineTotal = (line: PosCartLine) => lineSubtotal(line)-lineDiscount(line)
 
-async function importLegacyUserProducts(snapshot: PosBootstrap) {
-  const raw=window.localStorage.getItem('vertexia.product-inventory.v1')
-  if(!raw || !window.vertexia) return false
-  let products:ProductRecord[]=[]
-  try { const parsed=JSON.parse(raw) as { products?:ProductRecord[] };if(Array.isArray(parsed.products)) products=parsed.products }
-  catch { return false }
-  const userProducts=products.filter(product => !/^product-(?:[1-9]|1[0-2])$/.test(product.id) && product.status==='active')
-  let imported=false
-  for(const product of userProducts) {
-    const exists=snapshot.products.some(current => product.barcode ? current.barcode===product.barcode : current.name.toLowerCase()===product.name.toLowerCase())
-    if(exists) continue
-    await window.vertexia.pos.createProduct(snapshot.branchId,{ name:product.name,barcode:product.barcode,category:product.category,unit:product.unit,purchasePricePaisa:Math.round(product.purchasePriceRupees*100),sellingPricePaisa:Math.round(product.sellingPriceRupees*100),openingStockMilli:Math.round(product.stock*1000) })
-    imported=true
-  }
-  return imported
-}
-
 export function usePos() {
+  const saleOperation = useOperationIdentity('sale')
+  const busyRef = useRef(false)
   const [data,setData] = useState<PosBootstrap | null>(null)
   const [cart,setCart] = useState<PosCartLine[]>([])
   const [customerId,setCustomerId] = useState('customer-walk-in')
@@ -40,8 +26,7 @@ export function usePos() {
   const refresh = useCallback(async () => {
     if (!window.vertexia) { setError('Desktop database is unavailable. Start Vertexia with npm run dev:desktop.');setLoading(false);return }
     try {
-      let result = await window.vertexia.pos.getBootstrap('branch-main')
-      if(await importLegacyUserProducts(result)) result=await window.vertexia.pos.getBootstrap('branch-main')
+      const result = await window.vertexia.pos.getBootstrap('branch-main')
       setData(result)
       setError('')
       setCustomerId(current => result.customers.some(customer => customer.id === current) ? current : result.customers[0]?.id ?? '')
@@ -76,17 +61,20 @@ export function usePos() {
   const requestLines = (): PosCartLineInput[] => cart.map(line => ({ productId:line.id,quantityMilli:line.quantityInCartMilli,discountBasisPoints:line.discountBasisPoints }))
 
   const run = async <T,>(operation: () => Promise<T>) => {
+    if (busyRef.current) return undefined
+    busyRef.current = true
     setBusy(true);setError('')
     try { return await operation() }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'The operation could not be completed.');return undefined }
-    finally { setBusy(false) }
+    finally { busyRef.current = false;setBusy(false) }
   }
 
   const completeSale = async () => {
     if (!window.vertexia || !data) return
-    const result = await run(() => window.vertexia!.pos.completeSale({ branchId:data.branchId,customerId,lines:requestLines(),paymentMethod,cashReceivedPaisa }))
+    const request = { branchId:data.branchId,customerId,lines:requestLines(),paymentMethod,cashReceivedPaisa }
+    const result = await run(() => window.vertexia!.pos.completeSale({ ...request,operationId:saleOperation.idFor(request) }))
     if (!result) return
-    setReceipt(result);clearCart();setNotice(`${result.invoiceNumber} completed successfully.`);await refresh()
+    saleOperation.reset();notifyRetailDataChanged();setReceipt(result);clearCart();setNotice(`${result.invoiceNumber} completed successfully.`);await refresh()
   }
 
   const holdSale = async () => {
@@ -118,14 +106,14 @@ export function usePos() {
     if (!window.vertexia || !data) return false
     const result = await run(() => window.vertexia!.pos.openShift(data.branchId,openingCashPaisa))
     if (!result) return false
-    setNotice('Cash shift opened.');await refresh();return true
+    notifyRetailDataChanged();setNotice('Cash shift opened.');await refresh();return true
   }
 
   const createProduct = async (input: PosCreateProductInput) => {
     if (!window.vertexia || !data) return false
     const product = await run(() => window.vertexia!.pos.createProduct(data.branchId,input))
     if (!product) return false
-    setNotice(`${product.name} added.`);await refresh();return true
+    notifyRetailDataChanged();setNotice(`${product.name} added.`);await refresh();return true
   }
 
   const createCustomer = async (input: PosCreateCustomerInput) => {
