@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { changeStockValue, proportionalCost, stockCost } from './valuation.mjs'
 import type { DatabaseSync } from 'node:sqlite'
 import type { ProductCatalogRecord, PurchaseReceiveRequest, PurchaseReceiveResult, RetailPaymentMethod, RetailSnapshot, StockAdjustmentRequest, SupplierPayRequest } from '../../src/types/desktop-api.js'
 import { nextDocumentNumber, postOperation, requireBusinessDate, requireSafeInteger, requireText } from './posting.mjs'
@@ -14,7 +15,7 @@ export function retailBusinessDate(now: Date): string {
 }
 
 export class RetailRepository {
-  constructor(private readonly db: DatabaseSync, private readonly businessId: string, private readonly actorId: string, private readonly now: () => Date) {}
+  constructor(private readonly db: DatabaseSync, private readonly businessId: string, private readonly actorId: () => string, private readonly now: () => Date) {}
 
   private branch(id: string) {
     requireText(id, 'Branch', 100)
@@ -40,7 +41,7 @@ export class RetailRepository {
   }
 
   private audit(branchId: string, type: string, id: string, description: string, reference: string, occurredAt: string) {
-    this.db.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?,?)').run(newId('audit'), branchId, this.actorId, type, type.toLowerCase(), id, description, reference, occurredAt)
+    this.db.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?,?)').run(newId('audit'), branchId, this.actorId(), type, type.toLowerCase(), id, description, reference, occurredAt)
   }
 
   private payment(branchId: string, supplierId: string, amount: number, method: RetailPaymentMethod, reference: string, date: string, time: string): string {
@@ -64,10 +65,13 @@ export class RetailRepository {
       if (balance < 0) throw new Error('Adjustment cannot reduce stock below zero.')
       requireSafeInteger(balance, 'Stock balance')
       const time = this.now().toISOString(), id = newId('stock')
+      const quantityBefore = Number(product.quantity_milli)
+      const valueDelta = request.quantityDeltaMilli < 0 ? -stockCost(this.db,request.branchId,request.productId,-request.quantityDeltaMilli).costPaisa : quantityBefore ? proportionalCost(Number(this.db.prepare('SELECT total_cost_paisa FROM stock_values WHERE branch_id=? AND product_id=?').get(request.branchId,request.productId)!.total_cost_paisa),request.quantityDeltaMilli,quantityBefore) : proportionalCost(Number(product.purchase_price_paisa),request.quantityDeltaMilli)
       this.db.prepare(`INSERT INTO stock_levels(branch_id,product_id,quantity_milli,updated_at) VALUES (?,?,?,?)
         ON CONFLICT(branch_id,product_id) DO UPDATE SET quantity_milli=excluded.quantity_milli,updated_at=excluded.updated_at`).run(request.branchId, request.productId, balance, time)
       const type = request.quantityDeltaMilli > 0 ? 'adjustment_increase' : 'adjustment_decrease'
       this.db.prepare('INSERT INTO stock_movements VALUES (?,?,?,?,?,?,?,?,?,?)').run(id, request.branchId, request.productId, type, request.quantityDeltaMilli, balance, 'stock_adjustment', id, reason, time)
+      changeStockValue(this.db,request.branchId,request.productId,valueDelta,request.quantityDeltaMilli>0,time,id)
       this.audit(request.branchId, 'Inventory', id, reason, String(product.name), time)
       return { movementId: id, balanceAfterMilli: balance }
     })
@@ -117,9 +121,10 @@ export class RetailRepository {
         this.db.prepare('INSERT INTO purchase_items VALUES (?,?,?,?,?,?,?)').run(newId('purchase-item'), id, productId, String(line.product.name), line.quantity, line.cost, line.total)
         this.db.prepare(`INSERT INTO stock_levels(branch_id,product_id,quantity_milli,updated_at) VALUES (?,?,?,?)
           ON CONFLICT(branch_id,product_id) DO UPDATE SET quantity_milli=excluded.quantity_milli,updated_at=excluded.updated_at`).run(request.branchId, productId, balance, time)
-        this.db.prepare('INSERT INTO stock_movements VALUES (?,?,?,?,?,?,?,?,?,?)').run(newId('stock'), request.branchId, productId, 'purchase', line.quantity, balance, 'purchase', id, `Purchase ${number} from ${name}`, time)
-        // Catalog cost remains the latest purchase cost, as in the existing app.
-        // A separate per-branch weighted-average valuation engine is a later phase.
+        const movementId = newId('stock')
+        this.db.prepare('INSERT INTO stock_movements VALUES (?,?,?,?,?,?,?,?,?,?)').run(movementId, request.branchId, productId, 'purchase', line.quantity, balance, 'purchase', id, `Purchase ${number} from ${name}`, time)
+        changeStockValue(this.db,request.branchId,productId,line.total,false,time,movementId)
+        // Catalog cost is a reference; valuation and sale cost use the branch basis.
         this.db.prepare('UPDATE products SET purchase_price_paisa=?,updated_at=? WHERE id=? AND business_id=?').run(line.cost, time, productId, this.businessId)
       }
       this.db.prepare('INSERT INTO supplier_ledger VALUES (?,?,?,?,?,?,?,?)').run(newId('supplier-ledger'), request.branchId, supplierId, 'purchase', total, 0, id, time)

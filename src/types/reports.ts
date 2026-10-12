@@ -1,0 +1,7 @@
+export type ReportSection = 'transfers' | 'overview' | 'sales' | 'expenses' | 'purchases' | 'customers' | 'suppliers' | 'stock' | 'shifts'
+export type ReportQuery = { branchId: string; allBranches?: boolean; dateFrom: string; dateTo: string; section: ReportSection; page?: number; pageSize?: number }
+export type ReportColumn = { key: string; label: string; kind?: 'money' | 'quantity' }
+export type ReportTable = { title: string; columns: ReportColumn[]; rows: Record<string, string | number>[]; total: number; page: number; pageCount: number }
+export type StockValuation = { valuePaisa: number; estimatedValuePaisa: number; estimatedProducts: number; productCount: number }
+export type ReportSummary = StockValuation & { salesPaisa: number; returnsPaisa: number; netSalesPaisa: number; costPaisa: number; grossProfitPaisa: number; expensesPaisa: number; operatingProfitPaisa: number; purchasesPaisa: number; collectionsPaisa: number; supplierPaymentsPaisa: number; customerDuePaisa: number; customerCreditPaisa: number; supplierDuePaisa: number; supplierCreditPaisa: number; estimatedCostLines: number; stockAdjustmentCostPaisa: number; inTransitValuePaisa: number; inventoryValuePaisa: number }
+export type ReportSnapshot = { businessName: string; branchNames: string[]; dateFrom: string; dateTo: string; generatedAt: string; summary: ReportSummary; payments: { method: string; netSalesPaisa: number }[]; table: ReportTable }

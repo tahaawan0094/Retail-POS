@@ -20,7 +20,7 @@
     assert(button && !button.disabled, 'Missing/enabled action: ' + text)
     button.click()
   }
-  const navigate = name => document.querySelector('.sidebar button[aria-label="' + name + '"]').click()
+  const navigate = name => document.querySelector('[aria-label="Main navigation"] button[aria-label="' + name + '"]').click()
   const refresh = () => window.dispatchEvent(new Event('vertexia:retail-data-changed'))
   const api = window.vertexia
   assert(api?.retail, 'Retail preload API is unavailable')

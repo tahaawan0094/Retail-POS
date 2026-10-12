@@ -26,7 +26,7 @@ function Sparkline({ points,color='green' }: { points:DashboardChartPoint[]; col
 
 function StatCards({ data,onNavigate }: { data:DashboardSnapshot; onNavigate:(page:string)=>void }) {
   const rangeSales = data.selectedRangeLabel === 'This Week' ? 'This Week Sales' : `${data.selectedRangeLabel}'s Sales`
-  const rangeProfit = data.selectedRangeLabel === 'This Week' ? 'This Week Profit' : `${data.selectedRangeLabel}'s Profit`
+  const rangeProfit = data.selectedRangeLabel === 'This Week' ? 'This Week Gross Profit' : `${data.selectedRangeLabel}'s Gross Profit`
   return <div className="stats-grid">
     <div className="card stat-card green"><span className="round-icon"><Icon name="money" size={24} /></span><p>{rangeSales}</p><strong>{money(data.salesPaisa)}</strong><Sparkline points={data.chart} /><div className="stat-foot"><b className={(data.salesChangePercent ?? 0) < 0 ? 'negative' : ''}>{trend(data.salesChangePercent)}</b><span>{data.comparisonLabel}</span></div></div>
     <div className="card stat-card blue"><span className="round-icon"><Icon name="chart" size={24} /></span><p>{rangeProfit}</p><strong>{money(data.profitPaisa)}</strong><Sparkline points={data.chart} color="blue" /><div className="stat-foot"><b className={(data.profitChangePercent ?? 0) < 0 ? 'negative' : ''}>{trend(data.profitChangePercent)}</b><span>{data.comparisonLabel}</span></div></div>

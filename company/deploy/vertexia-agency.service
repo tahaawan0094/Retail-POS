@@ -1,0 +1,24 @@
+[Unit]
+Description=Vertexia company licensing and agency dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vertexia-agency
+Group=vertexia-agency
+WorkingDirectory=/opt/vertexia-agency/current
+EnvironmentFile=/etc/vertexia-agency.env
+ExecStart=/usr/bin/node scripts/company-license.mjs serve 8787
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vertexia-agency
+
+[Install]
+WantedBy=multi-user.target

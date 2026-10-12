@@ -391,3 +391,9 @@ select:focus-visible {
     font-size: 13px;
   }
 }
+
+/* Keep all authorized modules discoverable on shorter desktop windows. */
+.app-shell > .sidebar > nav { min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #9c8ec5 #211a3a; }
+.app-shell > .sidebar > nav::-webkit-scrollbar { display: block; width: 4px; }
+.app-shell > .sidebar > nav::-webkit-scrollbar-thumb { background: #9c8ec5; border-radius: 4px; }
+.app-shell > .sidebar > nav > .nav-item { flex-shrink: 0; }

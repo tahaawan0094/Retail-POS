@@ -1,0 +1,16 @@
+[Unit]
+Description=Verified private snapshot of Vertexia company registry and issuer
+
+[Service]
+Type=oneshot
+User=vertexia-agency
+Group=vertexia-agency
+WorkingDirectory=/opt/vertexia-agency/current
+EnvironmentFile=/etc/vertexia-agency.env
+ExecStart=/usr/bin/node scripts/backup-company.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/vertexia-agency

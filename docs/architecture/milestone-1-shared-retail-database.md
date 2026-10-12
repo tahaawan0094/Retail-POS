@@ -58,7 +58,7 @@ Vite uses relative build assets so the frontend works when Electron loads its lo
 
 ## Remaining limits and next work
 
-- Existing business, branch and owner IDs remain default/hardcoded. Real onboarding, login, sessions, permissions and manager approval remain the next foundation task. This is not yet a secured commercial release.
+- Update: local onboarding, login, staff accounts, sessions and enforced branch/role permissions are implemented in [Milestone 2](milestone-2-local-authentication.md). Manager overrides, cloud identity and commercial security acceptance remain pending. Existing primary keys are preserved.
 - Supplier contact editing/creation outside purchase receiving is not implemented.
 - Purchase orders/returns, batch/expiry tracking, serials and transfers remain future modules.
 - Catalog purchase cost remains the latest received cost. A per-branch moving-average inventory valuation engine is not yet implemented; current inventory value is a latest-cost estimate, not certified accounting valuation.

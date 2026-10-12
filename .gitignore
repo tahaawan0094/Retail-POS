@@ -29,3 +29,9 @@ dist-ssr
 
 # Local UI verification screenshots
 .screenshots/
+
+# Company secrets stay outside customer builds and version control.
+.company-licensing/
+*-private.pem
+.company-backups/
+.releases/

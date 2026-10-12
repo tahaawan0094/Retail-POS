@@ -335,4 +335,184 @@ export const migrations = [
       ) STRICT;
     `,
   },
+  {
+    version: 6,
+    sql: `
+      CREATE TABLE user_credentials (
+        user_id TEXT PRIMARY KEY REFERENCES users(id),
+        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        credential_version INTEGER NOT NULL DEFAULT 1,
+        must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0,1)),
+        failed_attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until TEXT,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE user_branches (
+        user_id TEXT NOT NULL REFERENCES users(id),
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        PRIMARY KEY (user_id,branch_id)
+      ) STRICT;
+      CREATE TABLE login_throttle (
+        username TEXT PRIMARY KEY COLLATE NOCASE,
+        failed_attempts INTEGER NOT NULL,
+        locked_until TEXT,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+    `,
+  },
+  {
+    version: 7,
+    sql: `
+      CREATE UNIQUE INDEX idx_cash_shifts_one_open ON cash_shifts(branch_id) WHERE status='open';
+      CREATE TABLE cash_shift_closings (
+        shift_id TEXT PRIMARY KEY REFERENCES cash_shifts(id),
+        counted_cash_paisa INTEGER NOT NULL CHECK (counted_cash_paisa >= 0),
+        expected_cash_paisa INTEGER NOT NULL,
+        variance_paisa INTEGER NOT NULL,
+        note TEXT NOT NULL,
+        closed_by TEXT NOT NULL REFERENCES users(id),
+        closed_at TEXT NOT NULL,
+        CHECK (variance_paisa = counted_cash_paisa - expected_cash_paisa)
+      ) STRICT;
+      CREATE TABLE cash_movement_notes (
+        transaction_id TEXT PRIMARY KEY REFERENCES cash_transactions(id),
+        reason TEXT NOT NULL,
+        created_by TEXT NOT NULL REFERENCES users(id)
+      ) STRICT;
+      CREATE TABLE backup_metadata (
+        id INTEGER PRIMARY KEY CHECK (id=1),
+        format TEXT NOT NULL CHECK (format='vertexia-backup-v1'),
+        created_at TEXT NOT NULL,
+        app_version TEXT NOT NULL
+      ) STRICT;
+      INSERT INTO app_meta(key,value) VALUES ('installation_id',lower(hex(randomblob(16))));
+    `,
+  },
+  {
+    version: 8,
+    sql: `
+      CREATE TABLE account_document_sequences (
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        kind TEXT NOT NULL CHECK(kind IN ('receipt','expense','reversal')),
+        business_date TEXT NOT NULL,
+        last_value INTEGER NOT NULL CHECK(last_value>=0),
+        PRIMARY KEY(branch_id,kind,business_date)
+      ) STRICT;
+      CREATE TABLE customer_receipts (
+        id TEXT PRIMARY KEY,
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        customer_id TEXT NOT NULL REFERENCES customers(id),
+        receipt_number TEXT NOT NULL,
+        business_date TEXT NOT NULL,
+        customer_name_snapshot TEXT NOT NULL,
+        customer_phone_snapshot TEXT NOT NULL,
+        amount_paisa INTEGER NOT NULL CHECK(amount_paisa>0),
+        balance_after_paisa INTEGER NOT NULL CHECK(balance_after_paisa>=0),
+        method TEXT NOT NULL CHECK(method IN ('Cash','Bank Transfer','JazzCash','Easypaisa','Card')),
+        reference TEXT NOT NULL,
+        created_by TEXT NOT NULL REFERENCES users(id),
+        created_at TEXT NOT NULL,
+        UNIQUE(branch_id,receipt_number)
+      ) STRICT;
+      CREATE INDEX idx_customer_receipts_branch_customer ON customer_receipts(branch_id,customer_id,created_at DESC);
+      CREATE TABLE expense_postings (
+        expense_id TEXT PRIMARY KEY REFERENCES expenses(id),
+        expense_number TEXT NOT NULL,
+        reference TEXT NOT NULL,
+        created_by TEXT NOT NULL REFERENCES users(id)
+      ) STRICT;
+      CREATE TABLE expense_reversals (
+        id TEXT PRIMARY KEY,
+        expense_id TEXT NOT NULL UNIQUE REFERENCES expenses(id),
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        reversal_number TEXT NOT NULL,
+        business_date TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        created_by TEXT NOT NULL REFERENCES users(id),
+        occurred_at TEXT NOT NULL,
+        UNIQUE(branch_id,reversal_number)
+      ) STRICT;
+      CREATE INDEX idx_expense_reversals_branch_date ON expense_reversals(branch_id,business_date);
+    `,
+  },
+  {
+    version: 9,
+    sql: `
+      CREATE TABLE stock_values (
+        branch_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        total_cost_paisa INTEGER NOT NULL CHECK(total_cost_paisa BETWEEN 0 AND 9007199254740991),
+        estimated INTEGER NOT NULL CHECK(estimated IN (0,1)),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(branch_id,product_id),
+        FOREIGN KEY(branch_id,product_id) REFERENCES stock_levels(branch_id,product_id)
+      ) STRICT;
+      CREATE TABLE stock_value_movements (
+        movement_id TEXT PRIMARY KEY REFERENCES stock_movements(id),
+        cost_delta_paisa INTEGER NOT NULL CHECK(cost_delta_paisa BETWEEN -9007199254740991 AND 9007199254740991),
+        cost_after_paisa INTEGER NOT NULL CHECK(cost_after_paisa BETWEEN 0 AND 9007199254740991),
+        estimated INTEGER NOT NULL CHECK(estimated IN (0,1))
+      ) STRICT;
+      CREATE TABLE sale_item_costs (
+        sale_item_id TEXT PRIMARY KEY REFERENCES sale_items(id),
+        total_cost_paisa INTEGER NOT NULL CHECK(total_cost_paisa BETWEEN 0 AND 9007199254740991),
+        estimated INTEGER NOT NULL CHECK(estimated IN (0,1))
+      ) STRICT;
+      INSERT INTO stock_values
+        SELECT s.branch_id,s.product_id,(s.quantity_milli/1000)*p.purchase_price_paisa
+          +(s.quantity_milli%1000)*(p.purchase_price_paisa/1000)
+          +((s.quantity_milli%1000)*(p.purchase_price_paisa%1000)+500)/1000,
+          CASE WHEN s.quantity_milli>0 THEN 1 ELSE 0 END,s.updated_at
+        FROM stock_levels s JOIN products p ON p.id=s.product_id;
+      INSERT INTO sale_item_costs SELECT id,(quantity_milli/1000)*unit_cost_paisa
+        +(quantity_milli%1000)*(unit_cost_paisa/1000)
+        +((quantity_milli%1000)*(unit_cost_paisa%1000)+500)/1000,1 FROM sale_items;
+    `,
+  },
+  {
+    version: 10,
+    sql: `
+      CREATE TABLE stock_transfers (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL REFERENCES businesses(id),
+        source_branch_id TEXT NOT NULL REFERENCES branches(id),
+        destination_branch_id TEXT NOT NULL REFERENCES branches(id),
+        transfer_number TEXT NOT NULL,
+        business_date TEXT NOT NULL,
+        note TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('dispatched','received','cancelled')),
+        dispatched_by TEXT NOT NULL REFERENCES users(id),
+        dispatched_at TEXT NOT NULL,
+        finished_by TEXT REFERENCES users(id),
+        finished_at TEXT,
+        finish_note TEXT NOT NULL DEFAULT '',
+        CHECK(source_branch_id!=destination_branch_id),
+        CHECK((status='dispatched' AND finished_at IS NULL AND finished_by IS NULL) OR (status!='dispatched' AND finished_at IS NOT NULL AND finished_by IS NOT NULL)),
+        UNIQUE(source_branch_id,transfer_number)
+      ) STRICT;
+      CREATE INDEX idx_transfers_source_status ON stock_transfers(source_branch_id,status,dispatched_at);
+      CREATE INDEX idx_transfers_destination_status ON stock_transfers(destination_branch_id,status,dispatched_at);
+      CREATE TABLE stock_transfer_items (
+        transfer_id TEXT NOT NULL REFERENCES stock_transfers(id),
+        product_id TEXT NOT NULL REFERENCES products(id),
+        product_name_snapshot TEXT NOT NULL,
+        sku_snapshot TEXT NOT NULL,
+        unit_snapshot TEXT NOT NULL,
+        quantity_milli INTEGER NOT NULL CHECK(quantity_milli BETWEEN 1 AND 9007199254740991),
+        cost_paisa INTEGER NOT NULL CHECK(cost_paisa BETWEEN 0 AND 9007199254740991),
+        estimated INTEGER NOT NULL CHECK(estimated IN (0,1)),
+        PRIMARY KEY(transfer_id,product_id)
+      ) STRICT;
+      CREATE TABLE transfer_document_sequences (
+        branch_id TEXT NOT NULL REFERENCES branches(id),
+        business_date TEXT NOT NULL,
+        last_value INTEGER NOT NULL CHECK(last_value>=0),
+        PRIMARY KEY(branch_id,business_date)
+      ) STRICT;
+      INSERT OR IGNORE INTO stock_levels
+        SELECT b.id,p.id,0,p.updated_at FROM branches b JOIN products p ON p.business_id=b.business_id WHERE b.is_active=1;
+      INSERT OR IGNORE INTO stock_values SELECT branch_id,product_id,0,0,updated_at FROM stock_levels WHERE quantity_milli=0;
+    `,
+  },
 ] as const

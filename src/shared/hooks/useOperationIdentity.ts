@@ -1,8 +1,10 @@
+import { useAuth } from '../../app/auth/useAuth'
 import { useRef } from 'react'
 
 // Retries keep the ID; changed input or successful checkout starts a new one.
 export function useOperationIdentity(scope: string) {
-  const storageKey = `vertexia.pending-operation.${scope}`
+  const { session } = useAuth()
+  const storageKey = `vertexia.pending-operation.${session!.userId}.${session!.branchId}.${scope}`
   const pending = useRef<{ fingerprint: string; id: string } | null>(null)
   return {
     idFor: (request: unknown) => {

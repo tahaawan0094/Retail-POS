@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { BusinessName, BranchName, UserName, UserRoleName } from '../../shared/layout/SessionIdentity'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon, type IconName } from '../../shared/ui/Icon'
 import { PageShell, type PageProps } from '../../shared/layout/PageShell'
@@ -8,20 +9,26 @@ import { useOperationIdentity } from '../../shared/hooks/useOperationIdentity'
 import { RetailDataStatus } from '../../shared/ui/RetailDataStatus'
 import type { InventoryMovementRecord, ProductRecord } from '../products/products.types'
 
+import { useAuth } from '../../app/auth/useAuth'
+import { useDesktopQuery } from '../../shared/hooks/useDesktopQuery'
+
 const money = (value: number) => value.toLocaleString('en-PK')
 const categoryColors = ['#287be5','#ee9418','#17ad86','#7653ec','#e84b6d','#15aa91']
 
 function InventoryHeader({ onMenu }: { onMenu: () => void }) {
-  return <header className="topbar inventory-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field inventory-global-search"><Icon name="search" size={19} /><input aria-label="Search" placeholder="Search products, customers, invoices, suppliers..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 2 unread"><Icon name="bell" size={24} /><span>2</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong>Noor Mart</strong><small>Main Branch</small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong>Riyaz Ahmed</strong><small>Owner</small></span><Icon name="chevron" size={16} /></button></div></header>
+  return <header className="topbar inventory-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field inventory-global-search"><Icon name="search" size={19} /><input aria-label="Search" placeholder="Search products, customers, invoices, suppliers..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 2 unread"><Icon name="bell" size={24} /><span>2</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong><BusinessName /></strong><small><BranchName /></small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong><UserName /></strong><small><UserRoleName /></small></span><Icon name="chevron" size={16} /></button></div></header>
 }
 
 function InventoryStats({ products, movements }: { products: ProductRecord[]; movements: InventoryMovementRecord[] }) {
-  const totalValue = products.reduce((total,product) => total + product.stock * product.purchasePriceRupees,0)
+  const { session } = useAuth()
+  const branchId = session!.branchId
+  const valuation = useDesktopQuery(useCallback(() => window.vertexia!.reports.valuation(branchId),[branchId]))
+  const totalValue = valuation.data ? valuation.data.valuePaisa/100 : null
   const low = products.filter(product => product.stock > 0 && product.stock <= product.minimumStock).length
   const out = products.filter(product => product.stock <= 0).length
   const stockIn = movements.filter(movement => movement.quantityDelta > 0).reduce((total,movement) => total + movement.quantityDelta,0)
   const cards: [IconName,string,string,string,string,string][] = [
-    ['box','Total Stock Value',`Rs ${money(totalValue)}`,'Live value','at purchase cost','green'],
+    ['box','Stock Cost Value',totalValue===null ? 'Loading...' : `Rs ${money(totalValue)}`,valuation.data?.estimatedProducts ? 'Includes estimates' : 'Live value',valuation.error ? 'Valuation unavailable' : 'branch average cost','green'],
     ['warning','Low Stock Items',String(low),'View Items','→','amber'],
     ['users','Out of Stock Items',String(out),'View Items','→','rose'],
     ['sale','Stock In',`${money(stockIn)} units`,'From movements','','blue'],
@@ -89,6 +96,3 @@ function InventoryScreen() {
 }
 
 export default function InventoryPage(props: PageProps) { return <PageShell {...props} activePage="Inventory" className="inventory-app" header={onMenu => <InventoryHeader onMenu={onMenu} />}><InventoryScreen /></PageShell> }
-
-
-

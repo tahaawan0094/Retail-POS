@@ -1,0 +1,9 @@
+export type UserRole = 'Owner' | 'Manager' | 'Cashier' | 'Inventory'
+export type Permission = 'branches.manage' | 'transfers.read' | 'transfers.dispatch' | 'transfers.receive' | 'transfers.cancel' | 'reports.read' | 'dashboard.read' | 'pos.sell' | 'pos.discount' | 'customers.create' | 'customers.read' | 'customers.manage' | 'customers.collect' | 'expenses.read' | 'expenses.manage' | 'shifts.open' | 'shifts.read' | 'shifts.close' | 'cash.manage' | 'backup.manage' | 'products.read' | 'products.manage' | 'retail.read' | 'stock.adjust' | 'purchases.receive' | 'suppliers.pay' | 'sales.read' | 'sales.return' | 'data.export' | 'users.manage' | 'settings.manage'
+export type AuthBranch = { id: string; name: string; code: string; city: string }
+export type AuthSession = { userId: string; name: string; username: string; role: UserRole; businessId: string; businessName: string; branches: AuthBranch[]; branchId: string; permissions: Permission[]; mustChangePassword: boolean }
+export type AuthStatus = { needsSetup: boolean; businessName: string; session: AuthSession | null; notice?: string }
+export type BusinessSetupInput = { businessName: string; branchName: string; city: string; ownerName: string; username: string; password: string }
+export type StaffUser = { id: string; name: string; username: string | null; role: string; isActive: boolean; hasLogin: boolean; branchIds: string[]; mustChangePassword: boolean }
+export type StaffCreateInput = { name: string; username: string; password: string; role: UserRole; branchIds: string[] }
+export type StaffUpdateInput = { userId: string; role: UserRole; isActive: boolean; branchIds: string[] }

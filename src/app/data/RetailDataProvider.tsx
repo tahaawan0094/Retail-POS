@@ -1,3 +1,4 @@
+import { useAuth } from '../auth/useAuth'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { RetailDataContext, type OperationResult, type RetailDataContextValue } from './retailData.context'
 import type { PurchaseDraft, PurchaseRecord } from '../../features/purchases/purchases.types'
@@ -8,7 +9,6 @@ import { RETAIL_DATA_CHANGED, notifyRetailDataChanged } from '../../services/ret
 
 type ViewData = Pick<RetailDataContextValue, 'products' | 'movements' | 'purchases' | 'suppliers' | 'supplierPayments' | 'supplierLedger' | 'businessDate'>
 const empty: ViewData = { products: [], movements: [], purchases: [], suppliers: [], supplierPayments: [], supplierLedger: [], businessDate: '' }
-const branchId = 'branch-main'
 
 function toFixedUnits(value: number, scale: number, label: string): number {
   const scaled = value * scale, rounded = Math.round(scaled)
@@ -29,6 +29,9 @@ function view(snapshot: RetailSnapshot): ViewData {
 }
 
 export function RetailDataProvider({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  const branchId = session!.branchId
+  const allowed = session!.permissions.includes('retail.read')
   const [snapshot, setSnapshot] = useState<ViewData>(empty)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -40,6 +43,7 @@ export function RetailDataProvider({ children }: { children: ReactNode }) {
   })
 
   const refresh = useCallback(async () => {
+    if (!allowed) { setLoading(false); return }
     const version = ++refreshVersion.current
     if (!window.vertexia?.retail) {
       setError('Desktop database is unavailable. Start Vertexia with npm run dev:desktop.')
@@ -53,7 +57,7 @@ export function RetailDataProvider({ children }: { children: ReactNode }) {
     } catch (cause) {
       if (version === refreshVersion.current) setError(cause instanceof Error ? cause.message : 'Retail records could not be loaded.')
     } finally { if (version === refreshVersion.current) setLoading(false) }
-  }, [])
+  }, [branchId, allowed])
 
   const invalidateRefresh = useCallback(() => { refreshVersion.current++ }, [])
 

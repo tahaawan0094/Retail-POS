@@ -1,8 +1,11 @@
+import { useAuth } from '../../app/auth/useAuth'
 import { useCallback, useEffect, useState } from 'react'
 import type { DashboardChartPeriod, DashboardDateRange, DashboardSnapshot } from '../../types/desktop-api'
 
 export function useDashboardData() {
-  const [branchId,setBranchId] = useState('branch-main')
+  const { session, selectBranch } = useAuth()
+  const branchId = session!.branchId
+  const setBranchId = (id: string) => { void selectBranch(id) }
   const [dateRange,setDateRange] = useState<DashboardDateRange>('today')
   const [chartPeriod,setChartPeriod] = useState<DashboardChartPeriod>('7_days')
   const [snapshot,setSnapshot] = useState<DashboardSnapshot | null>(null)
@@ -20,7 +23,6 @@ export function useDashboardData() {
       const result = await window.vertexia.dashboard.getSnapshot({ branchId,dateRange,chartPeriod })
       setSnapshot(result)
       setError('')
-      if (result.activeBranchId !== branchId) setBranchId(result.activeBranchId)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Dashboard data could not be loaded.')
     } finally {

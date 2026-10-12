@@ -1,45 +1,27 @@
-import { motion } from 'framer-motion'
-import { Icon, type IconName } from '../../shared/ui/Icon'
+import { useCallback, useEffect, useState } from 'react'
 import { PageShell, type PageProps } from '../../shared/layout/PageShell'
+import { Icon } from '../../shared/ui/Icon'
+import type { BackupStatus, BackupSummary } from '../../types/recovery'
+import '../../styles/recovery.css'
 
-function SettingsHeader({ onMenu }: { onMenu: () => void }) {
-  return <header className="topbar settings-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field settings-global-search"><Icon name="search" size={19} /><input aria-label="Search settings" placeholder="Search settings..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 3 unread"><Icon name="bell" size={24} /><span>3</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong>Noor Mart</strong><small>Main Branch</small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong>Riyaz Ahmed</strong><small>Owner</small></span><Icon name="chevron" size={16} /></button></div></header>
+export default function SettingsPage(props: PageProps) {
+  const [status, setStatus] = useState<BackupStatus | null>(null), [preview, setPreview] = useState<BackupSummary | null>(null)
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [currentPassword, setCurrentPassword] = useState(''), [backupOwnerUsername, setBackupOwnerUsername] = useState(''), [backupOwnerPassword, setBackupOwnerPassword] = useState(''), [confirmation, setConfirmation] = useState(''), [allowDifferentInstallation, setAllowDifferentInstallation] = useState(false)
+  const refresh = useCallback(async () => { setStatus(await window.vertexia!.backup.getStatus()) }, [])
+  useEffect(() => { const timer = window.setTimeout(() => void refresh().catch(cause => setError(String(cause.message ?? cause))), 0); return () => window.clearTimeout(timer) }, [refresh])
+  const run = async (action: () => Promise<void>) => {
+    if (busy) return
+    setBusy(true); setError(''); setNotice('')
+    try { await action(); await refresh() }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Backup operation failed.') }
+    finally { setBusy(false) }
+  }
+  return <PageShell {...props} activePage="Settings" className="settings-page" header={menu => <header className="recovery-header"><button aria-label="Toggle sidebar" onClick={menu}><Icon name="menu" /></button><h1>Settings</h1><button disabled={busy} onClick={() => void run(refresh)}>Refresh</button></header>}><main className="recovery-content">
+    <h2>Backup & restore</h2><p>Owner access only. Backups include all branches, stock, sales, purchases, cash shifts and user accounts.</p>
+    {error && <p className="recovery-error" role="alert">{error}</p>}{notice && <p className="recovery-notice" role="status">{notice}</p>}
+    <section className="recovery-card"><h2>Protect your data</h2><p>A local automatic backup is created once a day while the desktop app runs. Save a copy to another drive for protection against disk failure.</p><p>Backup files are unencrypted and contain business records and password hashes. Store them in a private location. Cloud backup is pending.</p><div className="recovery-actions"><button className="recovery-primary" disabled={busy || status?.busy} onClick={() => void run(async () => { const record = await window.vertexia!.backup.create(); setNotice('Backup created: ' + record.fileName) })}>Create backup</button><button disabled={busy || status?.busy} onClick={() => void run(async () => { if (preview) await window.vertexia!.backup.cancelRestore(preview.token); setPreview(null); const result = await window.vertexia!.backup.previewRestore(); if (!result.canceled && result.summary) { setPreview(result.summary); setBackupOwnerUsername(result.summary.ownerUsernames[0] ?? ''); setBackupOwnerPassword(''); setCurrentPassword(''); setConfirmation(''); setAllowDifferentInstallation(false) } })}>Select backup to restore</button></div><small className="recovery-path">Local folder: {status?.directory ?? 'Loading...'}</small>{status?.lastAutomaticError && <p className="recovery-error">Automatic backup failed: {status.lastAutomaticError}</p>}</section>
+    {preview && <section className="recovery-card restore-review"><h2>Review restore</h2><p><strong>{preview.businessName}</strong> &middot; {new Date(preview.createdAt).toLocaleString()} &middot; {preview.fileName}</p><p>{preview.products} products, {preview.sales} sales, {preview.purchases} purchases, {preview.openShifts} open shifts.</p><p className="recovery-warning">Restore replaces this installation's current records and accounts with the selected backup. Close all current shifts first. A safety copy will be created before replacement. Sign in afterwards with the credentials from the backup.</p>{preview.openShifts > 0 && <p className="recovery-warning">This backup has open shifts. Reconcile their cash after restoring.</p>}<form onSubmit={event => { event.preventDefault(); if (busy) return; setBusy(true); setError(''); void window.vertexia!.backup.restore({ token: preview.token, currentPassword, backupOwnerUsername, backupOwnerPassword, confirmation, allowDifferentInstallation }).then(() => window.dispatchEvent(new Event('vertexia:auth-refresh'))).catch(cause => setError(String(cause.message ?? cause))).finally(() => setBusy(false)) }}><fieldset disabled={busy}><div className="recovery-columns"><label>Current owner password<input name="currentOwnerPassword" type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label><label>Owner username in backup<input name="backupOwnerUsername" autoComplete="off" required value={backupOwnerUsername} onChange={event => setBackupOwnerUsername(event.target.value)} /></label><label>Owner password in backup<input name="backupOwnerPassword" type="password" autoComplete="off" required value={backupOwnerPassword} onChange={event => setBackupOwnerPassword(event.target.value)} /></label></div>{!preview.sameInstallation && <label className="recovery-check"><input type="checkbox" required checked={allowDifferentInstallation} onChange={event => setAllowDifferentInstallation(event.target.checked)} />I intend to replace this installation with data from a different installation.</label>}<label>Type RESTORE to confirm<input name="restoreConfirmation" autoComplete="off" required pattern="RESTORE" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label><div className="recovery-actions"><button type="submit" className="recovery-danger">Restore backup and sign out</button><button type="button" onClick={() => void run(async () => { await window.vertexia!.backup.cancelRestore(preview.token); setPreview(null) })}>Cancel restore</button></div></fieldset></form><small className="recovery-path">SHA-256: {preview.checksum}</small></section>}
+    <section className="recovery-card"><h2>Local backup history</h2><p>Latest 100 backups. Backups are retained until removed from the local folder.</p><div className="recovery-table"><table><thead><tr><th>Created</th><th>Type</th><th>File / size</th><th>Copy</th></tr></thead><tbody>{status?.records.map(row => <tr key={row.id}><td>{new Date(row.createdAt).toLocaleString()}</td><td>{row.kind.replaceAll('_', ' ')}</td><td>{row.fileName}<small>{(row.sizeBytes / 1024 / 1024).toFixed(2)} MB</small></td><td><button disabled={busy || status.busy} onClick={() => void run(async () => { const result = await window.vertexia!.backup.export(row.id); if (!result.canceled) setNotice('Backup copy saved: ' + result.path) })}>Save copy</button></td></tr>)}</tbody></table>{status && !status.records.length && <p>No backups yet. Create your first backup above.</p>}</div></section>
+  </main></PageShell>
 }
-
-function SettingsCategories() {
-  const categories: [IconName, string, string, string][] = [
-    ['store', 'Store Settings', 'Manage your store information, address, contact details and basic configuration.', 'blue'],
-    ['money', 'Tax & Pricing', 'Configure tax rates, pricing options, discounts and currency settings.', 'green'],
-    ['receipt', 'Receipt Settings', 'Customize receipt layout, logo, printer settings and receipt content.', 'purple'],
-    ['box', 'Product & Inventory', 'Set default units, low stock alerts, barcode settings and stock options.', 'amber'],
-    ['cart', 'Sales & Purchase', 'Configure invoice numbers, returns, payment methods and purchasing options.', 'rose'],
-    ['users', 'Users & Permissions', 'Manage staff accounts, roles, permissions and access control.', 'blue'],
-    ['report', 'Devices', 'Configure receipt printers, barcode scanners, label printers and other hardware.', 'purple'],
-    ['supplier', 'Integrations', 'Connect with third party services like JazzCash, Easypaisa, SMS and Email.', 'teal'],
-    ['cash', 'Backup & Data', 'Backup, restore and manage your store data.', 'blue'],
-    ['settings', 'System Settings', 'Manage application preferences, language, date and time settings.', 'blue'],
-  ]
-  return <div className="settings-category-grid">{categories.map(([icon,title,description,tone]) => <button className={`card settings-category ${tone}`} key={title}><span><Icon name={icon} size={29} /></span><div><strong>{title}</strong><p>{description}</p></div><Icon name="chevron" size={20} /></button>)}</div>
-}
-
-function StoreProfileSettings() {
-  const rows = [['user','Owner Name','Riyaz Ahmed'], ['sale','Phone','0301 1234567'], ['supplier','Email','noormart@gmail.com'], ['cash','CNIC / NTN','42201-1234567-9'], ['store','Address','Shop #12, Gulshan-e-Iqbal\nKarachi, Pakistan']]
-  return <section className="card settings-store-profile"><div className="settings-side-heading"><h2><Icon name="settings" size={18} /> Store Profile</h2><button>⌕ &nbsp; Edit</button></div><div className="settings-store-name"><span><Icon name="store" size={29} /></span><div><strong>Noor Mart</strong><small>Main Branch - Karachi</small></div><b>Active</b></div><div className="settings-profile-list">{rows.map(([icon,label,value]) => <div key={label}><Icon name={icon as IconName} size={16} /><span>{label}</span><strong>{value.split('\n').map((line,i) => <span key={line}>{line}{i === 0 && value.includes('\n') && <br />}</span>)}</strong></div>)}</div></section>
-}
-
-function SettingsQuickActions() {
-  const actions: [IconName, string, string][] = [['cash','Backup Now',''], ['arrow','Restore Data','restore'], ['report','Export Data',''], ['expense','Clear Old Data','danger']]
-  return <section className="card settings-quick-actions"><div className="settings-side-heading"><h2><Icon name="bolt" size={18} /> Quick Actions</h2></div><div>{actions.map(([icon,label,tone]) => <button className={tone} key={label}><Icon name={icon} size={18} />{label}</button>)}</div></section>
-}
-
-function SystemStatus() {
-  const rows = [['Database Connection','Connected','good'], ['Receipt Printer','Ready','good'], ['Barcode Scanner','Not Connected','neutral'], ['Internet Connection','Online','good']]
-  return <section className="card system-status"><div className="settings-side-heading"><h2><Icon name="check" size={18} /> System Status</h2></div><div>{rows.map(([label,status,tone]) => <div key={label}><i className={tone}>✓</i><span>{label}</span><strong className={tone}>{status}</strong></div>)}</div></section>
-}
-
-function SettingsScreen() {
-  return <motion.main className="settings-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}><div className="settings-title"><span><Icon name="settings" size={32} /></span><div><h1>Settings</h1><p>Manage your store configuration, preferences and system settings</p></div></div><div className="settings-layout"><SettingsCategories /><aside className="settings-side"><StoreProfileSettings /><SettingsQuickActions /><SystemStatus /></aside></div></motion.main>
-}
-
-
-export default function SettingsPage(props: PageProps) { return <PageShell {...props} activePage="Settings" className="settings-app" header={onMenu => <SettingsHeader onMenu={onMenu} />}><SettingsScreen /></PageShell> }

@@ -1,0 +1,8 @@
+export type CashShiftRecord = { id: string; branchId: string; cashierId: string; cashierName: string; openingCashPaisa: number; status: 'open' | 'closed'; openedAt: string; closedAt: string | null; expectedCashPaisa: number; countedCashPaisa: number | null; variancePaisa: number | null; closingNote: string; closedByName: string | null }
+export type CashSnapshot = { activeShift: CashShiftRecord | null; shifts: CashShiftRecord[]; movements: Array<{ id: string; shiftId: string; type: string; direction: 'in' | 'out'; amountPaisa: number; reference: string; note: string; occurredAt: string }>; movementCount: number }
+export type CashCloseRequest = { branchId: string; operationId: string; shiftId: string; countedCashPaisa: number; note: string }
+export type CashMoveRequest = { branchId: string; operationId: string; shiftId: string; direction: 'in' | 'out'; amountPaisa: number; reason: string }
+export type BackupSummary = { token: string; fileName: string; businessName: string; createdAt: string; schemaVersion: number; sizeBytes: number; checksum: string; sales: number; products: number; purchases: number; openShifts: number; sameInstallation: boolean; ownerUsernames: string[] }
+export type BackupRecord = { id: string; fileName: string; path: string; createdAt: string; sizeBytes: number; checksum: string; kind: 'manual' | 'before_restore' | 'automatic' }
+export type BackupStatus = { busy: boolean; directory: string; records: BackupRecord[]; lastAutomaticError: string | null }
+export type BackupRestoreRequest = { token: string; confirmation: string; currentPassword: string; backupOwnerUsername: string; backupOwnerPassword: string; allowDifferentInstallation: boolean }

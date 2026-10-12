@@ -1,4 +1,5 @@
-﻿import { useMemo, useState } from 'react'
+import { BusinessName, BranchName, UserName, UserRoleName } from '../../shared/layout/SessionIdentity'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Icon, type IconName } from '../../shared/ui/Icon'
 import { PageShell, type PageProps } from '../../shared/layout/PageShell'
@@ -14,7 +15,7 @@ const tones = ['blue','violet','red','orange','teal','brown','pink','green']
 const initials = (name: string) => name.split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()
 
 function SuppliersHeader({ onMenu }: { onMenu: () => void }) {
-  return <header className="topbar customers-topbar suppliers-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field customers-global-search"><Icon name="search" size={19} /><input aria-label="Search suppliers" placeholder="Search suppliers by name, phone, CNIC, city..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 2 unread"><Icon name="bell" size={24} /><span>2</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong>Noor Mart</strong><small>Main Branch</small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong>Riyaz Ahmed</strong><small>Owner</small></span><Icon name="chevron" size={16} /></button></div></header>
+  return <header className="topbar customers-topbar suppliers-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field customers-global-search"><Icon name="search" size={19} /><input aria-label="Search suppliers" placeholder="Search suppliers by name, phone, CNIC, city..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 2 unread"><Icon name="bell" size={24} /><span>2</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong><BusinessName /></strong><small><BranchName /></small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong><UserName /></strong><small><UserRoleName /></small></span><Icon name="chevron" size={16} /></button></div></header>
 }
 
 function SupplierStats({ suppliers }: { suppliers: SupplierRecord[] }) {

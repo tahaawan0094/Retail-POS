@@ -1,0 +1,16 @@
+@import './accounts.css';
+.report-stats { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.report-identity { margin: 22px 0; }
+.report-estimate { padding: 12px 16px; border-radius: 8px; background: #fff4dc; color: #704613; }
+.reports-live-page .recovery-content > h2 { margin: 22px 0 12px; }
+.reports-live-page .recovery-table td { white-space: nowrap; }
+@media print {
+  .reports-live-page .sidebar, .reports-live-page .session-bar, .reports-live-page .recovery-header,
+  .report-query-card, .report-pagination, .reports-live-page .recovery-notice { display: none !important; }
+  .reports-live-page, .reports-live-page .main-shell, .reports-live-page .recovery-content { display: block !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background: white !important; }
+  .reports-live-page .recovery-table { overflow: visible; }
+  .reports-live-page .recovery-card, .reports-live-page .recovery-stats section { box-shadow: none; break-inside: avoid; }
+  .reports-live-page table { font-size: 9px; }
+  .reports-live-page .recovery-table td { white-space: normal; }
+  .reports-live-page .recovery-table thead { display: table-header-group; }
+}

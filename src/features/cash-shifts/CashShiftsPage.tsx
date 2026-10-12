@@ -1,57 +1,55 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Icon, type IconName } from '../../shared/ui/Icon'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../../app/auth/useAuth'
+import { useOperationIdentity } from '../../shared/hooks/useOperationIdentity'
 import { PageShell, type PageProps } from '../../shared/layout/PageShell'
+import { Icon } from '../../shared/ui/Icon'
+import type { CashSnapshot } from '../../types/recovery'
+import '../../styles/recovery.css'
 
-function CashShiftsHeader({ onMenu }: { onMenu: () => void }) {
-  return <header className="topbar cash-shifts-topbar"><button className="icon-button menu-button" aria-label="Toggle sidebar" onClick={onMenu}><Icon name="menu" size={23} /></button><div className="search-field cash-shifts-global-search"><Icon name="search" size={19} /><input aria-label="Search" placeholder="Search invoices, products, customers..." /><kbd>Ctrl + K</kbd></div><div className="topbar-right"><button className="icon-button notification-button" aria-label="Notifications, 3 unread"><Icon name="bell" size={24} /><span>3</span></button><button className="store-switcher"><span className="store-avatar"><Icon name="store" size={22} /></span><span><strong>Noor Mart</strong><small>Main Branch</small></span><Icon name="chevron" size={16} /></button><button className="profile-button"><span className="avatar"><Icon name="user" size={26} /></span><span><strong>Riyaz Ahmed</strong><small>Owner</small></span><Icon name="chevron" size={16} /></button></div></header>
+const money = (value: number) => 'Rs ' + (value / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function amount(value: string) {
+  if (!/^\d+(\.\d{1,2})?$/.test(value.trim())) throw new Error('Enter a positive amount with at most two decimal places.')
+  const result = Math.round(Number(value) * 100)
+  if (!Number.isSafeInteger(result)) throw new Error('Amount is too large.')
+  return result
 }
-
-const cashTransactions = [
-  ['03 Oct 2026', '01:15 PM', 'Cash Sale', 'Invoice #SAL-2026-105', '+ Rs. 2,450', 'Cash', 'sale'],
-  ['03 Oct 2026', '12:30 PM', 'Cash Sale', 'Invoice #SAL-2026-104', '+ Rs. 1,850', 'Cash', 'sale'],
-  ['03 Oct 2026', '11:20 AM', 'Customer Payment', 'Received from Ahmed Khan', '+ Rs. 5,000', 'Cash', 'payment'],
-  ['03 Oct 2026', '11:05 AM', 'Cash Sale', 'Invoice #SAL-2026-103', '+ Rs. 3,200', 'Cash', 'sale'],
-  ['03 Oct 2026', '10:45 AM', 'Cash Sale', 'Invoice #SAL-2026-102', '+ Rs. 1,280', 'Cash', 'sale'],
-  ['03 Oct 2026', '10:10 AM', 'Cash Sale', 'Invoice #SAL-2026-101', '+ Rs. 3,450', 'Cash', 'sale'],
-  ['03 Oct 2026', '09:45 AM', 'Expense', 'Snacks for staff', '- Rs. 1,200', 'Cash', 'expense'],
-  ['03 Oct 2026', '09:30 AM', 'Expense', 'Transport', '- Rs. 2,000', 'Cash', 'expense'],
-  ['03 Oct 2026', '09:00 AM', 'Opening Cash', 'Opening cash for shift', '+ Rs. 5,000', 'Cash', 'opening'],
-]
-
-function CashShiftStats() {
-  const stats: [IconName, string, string, string, string][] = [
-    ['cash', 'Opening Cash', 'Rs. 5,000', 'Current Shift', 'green'],
-    ['cart', 'Cash Sales', 'Rs. 42,850', 'Today', 'blue'],
-    ['arrow', 'Cash Received', 'Rs. 5,000', 'Customer Payments', 'purple'],
-    ['arrow', 'Cash Expenses', 'Rs. 3,200', 'Today', 'rose'],
-  ]
-  return <div className="cash-shift-stats">{stats.map(([icon, label, value, note, tone]) => <section className={`card cash-shift-stat ${tone}`} key={label}><span><Icon name={icon} size={25} /></span><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></section>)}</div>
+export default function CashShiftsPage(props: PageProps) {
+  const { session, can } = useAuth()
+  const branchId = session!.branchId
+  const [data, setData] = useState<CashSnapshot | null>(null)
+  const [opening, setOpening] = useState('0'), [counted, setCounted] = useState(''), [note, setNote] = useState('')
+  const [direction, setDirection] = useState<'in' | 'out'>('out'), [moveAmount, setMoveAmount] = useState(''), [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const openOperation = useOperationIdentity('shift-open'), closeOperation = useOperationIdentity('shift-close'), moveOperation = useOperationIdentity('cash-move')
+  const refresh = useCallback(async () => { setData(await window.vertexia!.cash.getSnapshot(branchId)) }, [branchId])
+  useEffect(() => {
+    const load = () => { void refresh().catch(cause => setError(String(cause.message ?? cause))) }
+    const timer = window.setTimeout(load, 0)
+    window.addEventListener('vertexia:retail-data-changed', load)
+    window.addEventListener('focus', load)
+    return () => { window.clearTimeout(timer); window.removeEventListener('vertexia:retail-data-changed', load); window.removeEventListener('focus', load) }
+  }, [refresh])
+  const run = async (action: () => Promise<void>) => {
+    if (busy) return
+    setBusy(true); setError(''); setNotice('')
+    try { await action(); await refresh(); window.dispatchEvent(new Event('vertexia:retail-data-changed')) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Cash operation failed.') }
+    finally { setBusy(false) }
+  }
+  const shift = data?.activeShift
+  const variance = counted !== '' && /^\d+(\.\d{1,2})?$/.test(counted) ? Math.round(Number(counted) * 100) - (shift?.expectedCashPaisa ?? 0) : null
+  return <PageShell {...props} activePage="Cash & Shifts" className="cash-shifts-page" header={menu => <header className="recovery-header"><button aria-label="Toggle sidebar" onClick={menu}><Icon name="menu" /></button><h1>Cash & Shifts</h1><button disabled={busy} onClick={() => void run(refresh)}>Refresh</button></header>}>
+    <main className="recovery-content"><p>Open a drawer, record cash movements, then count the cash to close the shift. {session!.role === 'Cashier' && 'You can view and close your own shifts.'}</p>
+      {error && <p className="recovery-error" role="alert">{error}</p>}{notice && <p className="recovery-notice" role="status">{notice}</p>}
+      {!data ? <p>Loading cash records...</p> : <>
+        <div className="recovery-stats"><section><small>Shift status</small><strong>{shift ? 'Open' : 'Closed'}</strong><span>{shift?.cashierName ?? 'No open shift available'}</span></section><section><small>Opening cash</small><strong>{money(shift?.openingCashPaisa ?? 0)}</strong></section><section><small>Expected drawer cash</small><strong>{money(shift?.expectedCashPaisa ?? 0)}</strong><span>All transactions in this shift, including earlier dates</span></section></div>
+        <div className="recovery-columns">
+          <section className="recovery-card">{!shift ? <><h2>Open shift</h2><form onSubmit={event => { event.preventDefault(); void run(async () => { const value = amount(opening); const request = { branchId, openingCashPaisa: value }; await window.vertexia!.pos.openShift(branchId, value, openOperation.idFor(request)); openOperation.reset(); setNotice('Shift opened. You can now record cash sales.') }) }}><fieldset disabled={busy}><label>Opening cash (Rs)<input name="openingCash" inputMode="decimal" required value={opening} onChange={event => setOpening(event.target.value)} /></label><button type="submit" className="recovery-primary">Open shift</button></fieldset></form></> : <><h2>Close shift</h2><p>Opened {new Date(shift.openedAt).toLocaleString()}. Closing saves the counted amount and any shortage or excess.</p><form onSubmit={event => { event.preventDefault(); void run(async () => { const request = { branchId, shiftId: shift.id, countedCashPaisa: amount(counted), note }; const result = await window.vertexia!.cash.closeShift({ ...request, operationId: closeOperation.idFor(request) }); closeOperation.reset(); setCounted(''); setNote(''); setNotice('Shift closed. Cash difference: ' + money(result.variancePaisa ?? 0)) }) }}><fieldset disabled={busy}><label>Counted cash (Rs)<input name="countedCash" required inputMode="decimal" value={counted} onChange={event => setCounted(event.target.value)} /></label>{variance !== null && <p>Difference: <strong className={variance ? 'recovery-difference' : ''}>{money(variance)}</strong></p>}<label>Closing note {variance ? '(required for a difference)' : '(optional)'}<textarea name="closingNote" maxLength={500} required={Boolean(variance)} minLength={variance ? 3 : undefined} value={note} onChange={event => setNote(event.target.value)} /></label><button type="submit" className="recovery-primary">Close shift</button></fieldset></form></>}</section>
+          {can('cash.manage') && <section className="recovery-card"><h2>Cash in / cash out</h2><p>Use for drawer transfers. Record business expenses separately when the Expenses module is available.</p><form onSubmit={event => { event.preventDefault(); if (!shift) return; void run(async () => { const request = { branchId, shiftId: shift.id, direction, amountPaisa: amount(moveAmount), reason }; await window.vertexia!.cash.move({ ...request, operationId: moveOperation.idFor(request) }); moveOperation.reset(); setMoveAmount(''); setReason(''); setNotice('Cash movement saved.') }) }}><fieldset disabled={busy || !shift}><label>Movement<select name="cashDirection" value={direction} onChange={event => setDirection(event.target.value as 'in' | 'out')}><option value="out">Cash out</option><option value="in">Cash in</option></select></label><label>Amount (Rs)<input name="moveAmount" required inputMode="decimal" value={moveAmount} onChange={event => setMoveAmount(event.target.value)} /></label><label>Reason<input name="moveReason" minLength={3} maxLength={250} required value={reason} onChange={event => setReason(event.target.value)} /></label><button type="submit">Save cash movement</button></fieldset></form></section>}
+        </div>
+        <section className="recovery-card"><h2>Shift history</h2><p>Latest 100 shifts. Older imported closings may have no recorded cash count.</p><div className="recovery-table"><table><thead><tr><th>Opened</th><th>Cashier</th><th>Status</th><th>Expected</th><th>Counted</th><th>Difference</th><th>Closing note / closed by</th></tr></thead><tbody>{data.shifts.map(row => <tr key={row.id}><td>{new Date(row.openedAt).toLocaleString()}</td><td>{row.cashierName}</td><td>{row.status}</td><td>{money(row.expectedCashPaisa)}</td><td>{row.countedCashPaisa === null ? '-' : money(row.countedCashPaisa)}</td><td className={row.variancePaisa ? 'recovery-difference' : ''}>{row.variancePaisa === null ? '-' : money(row.variancePaisa)}</td><td>{row.closingNote || '-'}{row.closedByName && <small>{row.closedByName}</small>}</td></tr>)}</tbody></table>{!data.shifts.length && <p>No shifts recorded.</p>}</div></section>
+        <section className="recovery-card"><h2>Drawer transactions</h2><p>Latest {data.movements.length} of {data.movementCount} transactions for {shift ? 'the open' : 'your latest'} shift.</p><div className="recovery-table"><table><thead><tr><th>Time</th><th>Type</th><th>Direction</th><th>Amount</th><th>Reference / reason</th></tr></thead><tbody>{data.movements.map(row => <tr key={row.id}><td>{new Date(row.occurredAt).toLocaleString()}</td><td>{row.type.replaceAll('_', ' ')}</td><td>{row.direction}</td><td>{money(row.amountPaisa)}</td><td>{row.reference}<small>{row.note}</small></td></tr>)}</tbody></table></div></section>
+      </>}
+    </main>
+  </PageShell>
 }
-
-function ActiveShiftPanel() {
-  const [tab, setTab] = useState('Active Shift')
-  return <section className="card active-shift-card"><div className="cash-tabs">{['Active Shift', 'Shift History', 'Cash Transactions'].map(label => <button key={label} className={tab === label ? 'active' : ''} onClick={() => setTab(label)}>{label}</button>)}</div><div className="shift-status"><div><i /><span><strong>Shift In Progress</strong><small>Started on 03 Oct 2026 at 09:00 AM</small></span></div><div><small>Cashier</small><span className="cashier-avatar">A</span><span><strong>Ali Raza</strong><small>Cashier</small></span></div><div><small>Shift Duration</small><strong><Icon name="clock" size={16} /> 4h 35m</strong></div></div><div className="cash-transactions-heading"><h2>Recent Cash Transactions</h2><button><Icon name="plus" size={17} /> Add Transaction</button></div><div className="cash-transactions-scroll"><table><thead><tr><th>#</th><th>Date & Time</th><th>Type</th><th>Description</th><th>Amount</th><th>Payment Method</th><th>Added By</th><th>Actions</th></tr></thead><tbody>{cashTransactions.map(([date, time, type, description, amount, method, kind], index) => <tr key={`${time}-${type}`}><td>{index + 1}</td><td><strong>{date}</strong><small>{time}</small></td><td><span className={`cash-type ${kind}`}><Icon name={kind === 'sale' ? 'cart' : kind === 'payment' ? 'cash' : kind === 'expense' ? 'expense' : 'cash'} size={15} />{type}</span></td><td>{description}</td><td className={amount.startsWith('+') ? 'cash-positive' : 'cash-negative'}>{amount}</td><td>{method}</td><td><span className="cash-added-by"><i>A</i>Ali Raza</span></td><td><button className="cash-more" aria-label={`More actions for transaction ${index + 1}`}>•••</button></td></tr>)}</tbody></table></div></section>
-}
-
-function ShiftActions() {
-  const actions: [IconName, string, string][] = [['plus', 'Add Cash Transaction', ''], ['expense', 'Add Expense', ''], ['arrow', 'Cash Deposit', 'deposit'], ['arrow', 'Cash Withdrawal', 'withdrawal']]
-  return <section className="card shift-actions"><div className="cash-side-heading"><h2><Icon name="cash" size={18} /> Shift Actions</h2><button><Icon name="settings" size={15} /> Shift Settings</button></div><div className="shift-action-grid"><button className="close-shift"><Icon name="clock" size={17} /> Close Shift</button>{actions.map(([icon, label, tone]) => <button className={tone} key={label}><Icon name={icon} size={17} />{label}</button>)}</div></section>
-}
-
-function CurrentShiftSummary() {
-  const rows: [IconName, string, string, string][] = [['cash', 'Opening Cash', 'Rs. 5,000', 'green'], ['cart', 'Cash Sales', 'Rs. 42,850', 'blue'], ['supplier', 'Cash Returns', 'Rs. 0', 'rose'], ['cash', 'Customer Payments', 'Rs. 5,000', 'blue'], ['expense', 'Expenses', 'Rs. 3,200', 'rose']]
-  return <section className="card current-shift-summary"><div className="cash-side-heading"><h2><Icon name="receipt" size={18} /> Current Shift Summary</h2></div><div className="shift-summary-list">{rows.map(([icon, label, value, tone]) => <div className={tone} key={label}><span><Icon name={icon} size={14} />{label}</span><strong>{value}</strong></div>)}</div><div className="expected-cash"><span>Expected Closing Cash</span><strong>Rs. 49,650</strong></div><label className="actual-cash"><span>Actual Closing Cash</span><span><input value="49650" readOnly /><b>Rs.</b></span></label><div className="cash-difference"><span>Difference</span><strong>Rs. 0</strong></div></section>
-}
-
-function TodayCashSummary() {
-  const rows = [['Cash Sales', 'Rs. 42,850', '#2679e8'], ['Customer Payments', 'Rs. 5,000', '#1b76b8'], ['Cash Expenses', 'Rs. 3,200', '#f3a13b'], ['Cash Returns', 'Rs. 0', '#ec395d']]
-  return <section className="card today-cash-summary"><div className="cash-side-heading"><h2><Icon name="plus" size={18} /> Today's Cash Summary</h2></div><div className="cash-chart-wrap"><div className="cash-donut"><div><strong>Rs. 47,850</strong><small>Net Cash</small></div></div><div className="cash-chart-legend">{rows.map(([label, value, color]) => <div key={label}><i style={{ background: color }} /><span>{label}</span><strong>{value}</strong></div>)}</div></div></section>
-}
-
-function CashShiftsScreen() {
-  return <motion.main className="cash-shifts-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}><div className="cash-shifts-title-row"><div className="cash-shifts-title"><span><Icon name="cash" size={28} /></span><div><h1>Cash &amp; Shifts</h1><p>Manage cash drawers, shifts and cash transactions</p></div></div><button className="open-shift"><Icon name="plus" size={18} /> Open New Shift</button></div><CashShiftStats /><div className="cash-shifts-layout"><ActiveShiftPanel /><aside className="cash-shifts-side"><ShiftActions /><CurrentShiftSummary /><TodayCashSummary /></aside></div></motion.main>
-}
-
-
-export default function CashShiftsPage(props: PageProps) { return <PageShell {...props} activePage="Cash & Shifts" className="cash-shifts-app" header={onMenu => <CashShiftsHeader onMenu={onMenu} />}><CashShiftsScreen /></PageShell> }

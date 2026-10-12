@@ -1,0 +1,10 @@
+# Install this site block alongside existing sites after DNS points at the server.
+# Caddy obtains and renews the TLS certificate. Keep ports 80 and 443 accessible.
+license.vertexiaagency.com {
+    request_body {
+        max_size 16KB
+    }
+    reverse_proxy 127.0.0.1:8787 {
+        header_up Host {host}
+    }
+}

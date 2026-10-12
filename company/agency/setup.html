@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vertexia — Agency Setup</title><link rel="stylesheet" href="/agency/agency.css"><script src="/agency/setup.js" defer></script></head>
+<body>
+  <header class="masthead"><a class="brand" href="/agency/"><span class="brand-mark">V</span><span>Vertexia<small>AGENCY CONSOLE</small></span></a><span id="secure-label">First-time company setup</span></header>
+  <main>
+    <section class="login-panel">
+      <div class="eyebrow">YOUR COMPANY ACCOUNT</div><h1>Set up your<br>control centre.</h1><p>This agency account manages customer licenses and branch access. It is separate from a shop owner's POS account.</p>
+      <form id="setup-form" class="card login-card">
+        <h2>Create agency account</h2>
+        <label>Username<input name="username" autocomplete="username" required placeholder="agency.admin"></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" required></label>
+        <label>Confirm password<input name="confirmation" type="password" autocomplete="new-password" required></label>
+        <button class="primary" type="submit">Create account</button><p class="muted">This private setup closes after the first account is created.</p>
+      </form>
+      <form id="enrollment-form" class="card login-card" hidden>
+        <h2>Add your authenticator</h2><p class="muted">In your authenticator app, add a time-based account named Vertexia Agency using this setup key. Keep a private recovery copy before continuing; it will not be shown again.</p>
+        <label>Authenticator setup key<textarea id="enrollment-key" readonly aria-label="Authenticator setup key"></textarea></label>
+        <button id="copy-secret" type="button" class="quiet">Copy setup key</button>
+        <label>Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="6-digit code"></label>
+        <button class="primary" type="submit">Verify and open dashboard</button><p class="muted">If setup is interrupted, use the private administrator recovery command described in the local setup guide.</p>
+      </form>
+    </section><p id="error" class="error" role="alert" hidden></p>
+  </main><footer>Vertexia Retail POS · Company administration</footer>
+</body></html>

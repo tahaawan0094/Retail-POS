@@ -289,6 +289,68 @@ export type RetailSnapshot = {
 }
 
 export type VertexiaDesktopApi = {
+  licensing: {
+    status(): Promise<import('./licensing.js').LicenseStatus>
+    activate(key: string): Promise<import('./licensing.js').LicenseStatus>
+    refresh(): Promise<import('./licensing.js').LicenseStatus>
+  }
+  branches: {
+    list(): Promise<import('./branches.js').BranchRecord[]>
+    create(request: import('./branches.js').BranchCreateRequest): Promise<{branchId: string}>
+    update(request: import('./branches.js').BranchUpdateRequest): Promise<{branchId: string}>
+    setActive(request: import('./branches.js').BranchActiveRequest): Promise<{branchId: string}>
+  }
+  transfers: {
+    list(query: import('./branches.js').TransferQuery): Promise<import('./branches.js').TransferSnapshot>
+    detail(branchId: string, id: string): Promise<import('./branches.js').TransferRecord>
+    dispatch(request: import('./branches.js').TransferDispatchRequest): Promise<import('./branches.js').TransferRecord>
+    receive(request: import('./branches.js').TransferReceiveRequest): Promise<import('./branches.js').TransferRecord>
+    cancel(request: import('./branches.js').TransferCancelRequest): Promise<import('./branches.js').TransferRecord>
+  }
+  reports: {
+    snapshot(query: import('./reports.js').ReportQuery): Promise<import('./reports.js').ReportSnapshot>
+    valuation(branchId: string): Promise<import('./reports.js').StockValuation>
+    exportCsv(query: import('./reports.js').ReportQuery): Promise<{ canceled: boolean; path?: string }>
+  }
+  customers: {
+    list(query: import('./accounts.js').CustomerQuery): Promise<import('./accounts.js').CustomerSnapshot>
+    detail(branchId: string, customerId: string, page?: number): Promise<import('./accounts.js').CustomerDetail>
+    receipt(branchId: string, receiptId: string): Promise<import('./accounts.js').CustomerReceipt>
+    create(request: import('./accounts.js').CustomerCreateRequest): Promise<{ customerId: string }>
+    update(request: import('./accounts.js').CustomerUpdateRequest): Promise<{ customerId: string }>
+    collect(request: import('./accounts.js').CustomerCollectRequest): Promise<import('./accounts.js').CustomerReceipt>
+  }
+  expenses: {
+    list(query: import('./accounts.js').ExpenseQuery): Promise<import('./accounts.js').ExpenseSnapshot>
+    post(request: import('./accounts.js').ExpensePostRequest): Promise<{ expenseId: string; number: string }>
+    reverse(request: import('./accounts.js').ExpenseReverseRequest): Promise<{ reversalId: string; number: string }>
+  }
+  cash: {
+    getSnapshot(branchId: string): Promise<import('./recovery.js').CashSnapshot>
+    closeShift(request: import('./recovery.js').CashCloseRequest): Promise<import('./recovery.js').CashShiftRecord>
+    move(request: import('./recovery.js').CashMoveRequest): Promise<{ transactionId: string; expectedCashPaisa: number }>
+  }
+  backup: {
+    getStatus(): Promise<import('./recovery.js').BackupStatus>
+    create(): Promise<import('./recovery.js').BackupRecord>
+    export(id: string): Promise<{ canceled: boolean; path?: string }>
+    previewRestore(): Promise<{ canceled: boolean; summary?: import('./recovery.js').BackupSummary }>
+    cancelRestore(token: string): Promise<void>
+    restore(request: import('./recovery.js').BackupRestoreRequest): Promise<{ safetyBackupPath: string }>
+  }
+  auth: {
+    status(): Promise<import('./auth.js').AuthStatus>
+    setup(input: import('./auth.js').BusinessSetupInput): Promise<import('./auth.js').AuthSession>
+    login(username: string, password: string): Promise<import('./auth.js').AuthSession>
+    logout(): Promise<void>
+    selectBranch(branchId: string): Promise<import('./auth.js').AuthSession>
+    listUsers(): Promise<import('./auth.js').StaffUser[]>
+    createUser(input: import('./auth.js').StaffCreateInput): Promise<import('./auth.js').StaffUser[]>
+    updateUser(input: import('./auth.js').StaffUpdateInput): Promise<import('./auth.js').StaffUser[]>
+    resetPassword(userId: string, password: string): Promise<void>
+    changePassword(currentPassword: string, newPassword: string): Promise<import('./auth.js').AuthSession>
+    onSessionExpired(callback: () => void): () => void
+  }
   retail: {
     getSnapshot(branchId:string):Promise<RetailSnapshot>
     adjustStock(request:StockAdjustmentRequest):Promise<{movementId:string;balanceAfterMilli:number}>
@@ -305,7 +367,7 @@ export type VertexiaDesktopApi = {
     holdSale(branchId: string,customerId: string,lines: PosCartLineInput[]): Promise<PosHeldSale>
     resumeHeldSale(id: string): Promise<PosHeldSale>
     deleteHeldSale(id: string): Promise<void>
-    openShift(branchId: string,openingCashPaisa: number): Promise<string>
+    openShift(branchId: string,openingCashPaisa: number,operationId?: string): Promise<string>
     createProduct(branchId: string,input: PosCreateProductInput): Promise<PosProduct>
     createCustomer(input: PosCreateCustomerInput): Promise<PosCustomer>
   }

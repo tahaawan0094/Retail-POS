@@ -1,0 +1,7 @@
+.license-notice { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 20px; background:#fff5df; color:#713d00; border-bottom:1px solid #efd398; font-size:13px; }
+.license-notice button { flex-shrink:0; padding:7px 12px; border:1px solid #b98627; border-radius:6px; background:white; cursor:pointer; color:inherit; }
+.license-value { display:block; margin-top:6px; }
+.license-state { padding:12px; border-radius:8px; background:#f4f0ff; }
+.license-identities dd { overflow-wrap:anywhere; margin:4px 0 18px; font-family:monospace; }
+.license-identities dt { font-weight:600; }
+@media (max-width:600px) { .license-notice { align-items:flex-start; flex-direction:column; } }

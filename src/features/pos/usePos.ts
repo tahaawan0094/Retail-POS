@@ -1,3 +1,4 @@
+import { useAuth } from '../../app/auth/useAuth'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import type { PosBootstrap,PosCartLineInput,PosCompletedSale,PosCreateCustomerInput,PosCreateProductInput,PosPaymentMethod,PosProduct } from '../../types/desktop-api'
 import { useOperationIdentity } from '../../shared/hooks/useOperationIdentity'
@@ -10,7 +11,10 @@ export const lineDiscount = (line: PosCartLine) => Math.round(lineSubtotal(line)
 export const lineTotal = (line: PosCartLine) => lineSubtotal(line)-lineDiscount(line)
 
 export function usePos() {
+  const { session, can } = useAuth()
+  const branchId = session!.branchId
   const saleOperation = useOperationIdentity('sale')
+  const shiftOperation = useOperationIdentity('shift-open')
   const busyRef = useRef(false)
   const [data,setData] = useState<PosBootstrap | null>(null)
   const [cart,setCart] = useState<PosCartLine[]>([])
@@ -26,13 +30,13 @@ export function usePos() {
   const refresh = useCallback(async () => {
     if (!window.vertexia) { setError('Desktop database is unavailable. Start Vertexia with npm run dev:desktop.');setLoading(false);return }
     try {
-      const result = await window.vertexia.pos.getBootstrap('branch-main')
+      const result = await window.vertexia.pos.getBootstrap(branchId)
       setData(result)
       setError('')
       setCustomerId(current => result.customers.some(customer => customer.id === current) ? current : result.customers[0]?.id ?? '')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'POS data could not be loaded.') }
     finally { setLoading(false) }
-  },[])
+  },[branchId])
 
   useEffect(() => { const task=window.setTimeout(() => void refresh(),0);return () => window.clearTimeout(task) },[refresh])
   useEffect(() => { if (!notice) return;const timer=window.setTimeout(() => setNotice(''),3000);return () => window.clearTimeout(timer) },[notice])
@@ -104,9 +108,10 @@ export function usePos() {
 
   const openShift = async (openingCashPaisa: number) => {
     if (!window.vertexia || !data) return false
-    const result = await run(() => window.vertexia!.pos.openShift(data.branchId,openingCashPaisa))
+    const request = { branchId: data.branchId, openingCashPaisa }
+    const result = await run(() => window.vertexia!.pos.openShift(data.branchId,openingCashPaisa,shiftOperation.idFor(request)))
     if (!result) return false
-    notifyRetailDataChanged();setNotice('Cash shift opened.');await refresh();return true
+    shiftOperation.reset();notifyRetailDataChanged();setNotice('Cash shift opened.');await refresh();return true
   }
 
   const createProduct = async (input: PosCreateProductInput) => {
@@ -123,7 +128,7 @@ export function usePos() {
     await refresh();setCustomerId(customer.id);setNotice(`${customer.name} added.`);return true
   }
 
-  return { data,cart,customerId,setCustomerId,paymentMethod,setPaymentMethod,cashReceived,setCashReceived,subtotalPaisa,discountPaisa,totalPaisa,cashReceivedPaisa,changePaisa,loading,busy,error,setError,notice,receipt,setReceipt,refresh,addProduct,setQuantity,setDiscount,removeLine,clearCart,completeSale,holdSale,resumeSale,deleteHeldSale,openShift,createProduct,createCustomer }
+  return { canDiscount: can('pos.discount'), data,cart,customerId,setCustomerId,paymentMethod,setPaymentMethod,cashReceived,setCashReceived,subtotalPaisa,discountPaisa,totalPaisa,cashReceivedPaisa,changePaisa,loading,busy,error,setError,notice,receipt,setReceipt,refresh,addProduct,setQuantity,setDiscount,removeLine,clearCart,completeSale,holdSale,resumeSale,deleteHeldSale,openShift,createProduct,createCustomer }
 }
 
 export type PosController = ReturnType<typeof usePos>

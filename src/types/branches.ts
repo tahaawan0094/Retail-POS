@@ -1,0 +1,12 @@
+export type BranchRecord = { id: string; name: string; code: string; city: string; isActive: boolean; createdAt: string; stockedProducts: number; stockValuePaisa: number; assignedStaff: number; openShifts: number; pendingTransfers: number }
+export type BranchCreateRequest = { branchId: string; operationId: string; name: string; code: string; city: string }
+export type BranchUpdateRequest = { branchId: string; operationId: string; targetBranchId: string; name: string; city: string }
+export type BranchActiveRequest = { branchId: string; operationId: string; targetBranchId: string; isActive: boolean; reason: string }
+export type TransferLineInput = { productId: string; quantityMilli: number }
+export type TransferDispatchRequest = { branchId: string; operationId: string; destinationBranchId: string; note: string; lines: TransferLineInput[] }
+export type TransferReceiveRequest = { branchId: string; operationId: string; transferId: string; note: string }
+export type TransferCancelRequest = { branchId: string; operationId: string; transferId: string; reason: string }
+export type TransferStatus = 'dispatched' | 'received' | 'cancelled'
+export type TransferRecord = { id: string; number: string; sourceBranchId: string; sourceBranchName: string; destinationBranchId: string; destinationBranchName: string; status: TransferStatus; note: string; dispatchedAt: string; dispatchedBy: string; finishedAt: string | null; finishedBy: string | null; finishNote: string; totalCostPaisa: number; lines: { productId: string; name: string; sku: string; unit: string; quantityMilli: number; costPaisa: number; estimated: boolean }[] }
+export type TransferQuery = { branchId: string; status: 'all' | TransferStatus; page: number; pageSize: number }
+export type TransferSnapshot = { records: TransferRecord[]; total: number; page: number; pageCount: number; outboundCount: number; inboundCount: number; outboundValuePaisa: number; inboundValuePaisa: number }

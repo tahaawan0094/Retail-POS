@@ -24,7 +24,7 @@ test('creates the production schema once and seeds a usable store', () => {
   const productCount = database.connection.prepare('SELECT COUNT(*) AS count FROM products').get().count
   const foreignKeys = database.connection.prepare('PRAGMA foreign_keys').get().foreign_keys
 
-  assert.equal(version, 5)
+  assert.equal(version, 10)
   assert.equal(productCount, 12)
   assert.equal(foreignKeys, 1)
 })
